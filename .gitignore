@@ -1,0 +1,11 @@
+# Build output directory (compiled binary files)
+build/
+
+# macOS System Files
+.DS_Store
+
+# IDE & Editor folders
+.vscode/
+.idea/
+*.xcodeproj/
+*.xcworkspace/

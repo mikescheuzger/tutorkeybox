@@ -1,0 +1,43 @@
+*********************************************
+THE TUTOR KEYBOX - DOCUMENTATION
+*********************************************
+
+
+1. GENERAL
+
+2. IDE, FILES & COMPILING
+
+2.1 IDEs - Thoughts and Notes
+
+2.2 The file structure on my computer
+
+2.3 The console, terminal and bash
+
+2.4 Using AI Code Assistants
+
+2.5 Git
+
+3. C++
+3.1 Syntax and Concepts
+3.1.0 variables and data types
+3.1.1 functions
+for, while, switch, 
+3.1.2 classes and structs
+3.1.3 inheritance
+3.1.4 polymorphism
+3.1.5 templates
+3.1.6 exceptions
+3.1.7 pointers
+3.1.9 namespaces
+3.1.10 preprocessor
+3.1.11 comments
+3.1.12 keywords
+3.1.13 operators
+3.1.14 explicit
+3.1.15 memory management
+
+4. ARCHITEKTUR
+
+5. KERNFUNKTIONEN
+
+

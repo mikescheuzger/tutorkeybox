@@ -2,7 +2,7 @@
 
 MidiMonitorView::MidiMonitorView(const MidiState &stateToMonitor)
     : midiState(stateToMonitor) {
-  // Start timer at 30 Hz (updates every ~33 milliseconds)
+  // Start timer at 30 Hz refresh rate (every 33 ms)
   startTimerHz(30);
 }
 
@@ -13,13 +13,14 @@ void MidiMonitorView::timerCallback() {
   bool active = midiState.isNoteActive.load(std::memory_order_relaxed);
   int note = midiState.currentNote.load(std::memory_order_relaxed);
   float vel = midiState.currentVelocity.load(std::memory_order_relaxed);
-
+  bool sustain = midiState.isSustainPedalDown.load(std::memory_order_relaxed);
   // Only request a UI repaint if the state actually changed
   if (active != lastNoteActive || note != lastNoteNumber ||
-      vel != lastVelocity) {
+      vel != lastVelocity || sustain != lastSustainPedal) {
     lastNoteActive = active;
     lastNoteNumber = note;
     lastVelocity = vel;
+    lastSustainPedal = sustain;
     repaint();
   }
 }
@@ -52,6 +53,13 @@ void MidiMonitorView::paint(juce::Graphics &g) {
     g.setFont(juce::FontOptions(14.0f, juce::Font::bold));
     g.drawText("GATE OPEN", area.getX() + 20, area.getY(), 100, 20,
                juce::Justification::left);
+
+    // Sustain Pedal Status Badge
+    if (lastSustainPedal) {
+      g.setColour(juce::Colour(0xffffa500));
+      g.drawText("[SUSTAIN HELD]", area.getX() + 130, area.getY(), 140, 20,
+                 juce::Justification::left);
+    }
 
     area.removeFromTop(35);
 
@@ -88,8 +96,15 @@ void MidiMonitorView::paint(juce::Graphics &g) {
     // --- STANDBY STATE (Disappears when no note is pressed) ---
     g.setColour(juce::Colour(0xff57606f));
     g.setFont(juce::FontOptions(16.0f, juce::Font::italic));
-    g.drawText("No MIDI note active (Waiting for input...)", area,
-               juce::Justification::centredLeft);
+
+    if (lastSustainPedal) {
+      g.setColour(juce::Colour(0xffffa500));
+      g.drawText("[SUSTAIN HELD]", area.getX() + 130, area.getY(), 140, 20,
+                 juce::Justification::left);
+    } else {
+      g.drawText("No MIDI note active (Waiting for input...)", area,
+                 juce::Justification::centredLeft);
+    }
   }
 }
 

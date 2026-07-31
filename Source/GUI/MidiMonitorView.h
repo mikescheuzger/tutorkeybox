@@ -23,6 +23,7 @@ private:
   bool lastNoteActive{false};
   int lastNoteNumber{-1};
   float lastVelocity{0.0f};
+  bool lastSustainPedal{false};
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiMonitorView)
 };

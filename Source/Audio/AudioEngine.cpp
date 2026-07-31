@@ -37,6 +37,10 @@ void AudioEngine::handleIncomingMidiMessage(juce::MidiInput * /*source*/,
     midiState.noteOn(message.getNoteNumber(), message.getFloatVelocity());
   } else if (message.isNoteOff()) {
     midiState.noteOff(message.getNoteNumber());
+  } else if (message.isController() && message.getControllerNumber() == 64) {
+    // 64 weil MIDI CC 64 Sustain Pedal ist
+    bool pedalDown = (message.getControllerValue() >= 64);
+    midiState.setSustainPedal(pedalDown);
   }
 }
 

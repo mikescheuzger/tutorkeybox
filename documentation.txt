@@ -13,9 +13,20 @@ THE TUTOR KEYBOX - DOCUMENTATION
 
 2.3 The console, terminal and bash
 
-2.4 Using AI Code Assistants
+2.4 IT concepts and terminology
 
-2.5 Git
+2.5 Git Workflow & Branching
+---------------------------------------------
+- main: The stable production branch containing tested, compiling code.
+- Feature Branches: Parallel sandbox branches (e.g. git checkout -b feature/name) 
+  used to build new components without risking the stability of main.
+- Basic Commands:
+  - git add .                  : Stage all file changes
+  - git commit -m "Message"    : Save local snapshot of staged files
+  - git push                   : Upload local commits to remote GitHub repository
+  - git checkout -b <branch>   : Create and switch to a new feature branch
+  - git merge <branch>         : Merge finished feature code back into main
+
 
 3. C++
 3.1 Syntax and Concepts
@@ -36,8 +47,99 @@ for, while, switch,
 3.1.14 explicit
 3.1.15 memory management
 
-4. ARCHITEKTUR
+4. ARCHITECTURE
+4.1 High Level Summary
+MERMAID:
+graph TD
+    subgraph Hardware ["🔌 Physical Hardware"]
+        MIDI_KB["🎹 USB MIDI Keyboard / Controller"]
+        SOUND_CARD["🔊 Soundcard / Audio Output (DAC)"]
+    end
 
-5. KERNFUNKTIONEN
+    subgraph OS_Layer ["💻 OS & JUCE Drivers Layer"]
+        CORE_AUDIO["CoreAudio / CoreMIDI (macOS)"]
+        ALSA_JACK["ALSA / JACK (Raspberry Pi 5)"]
+        JUCE_ADM["juce::AudioDeviceManager"]
+    end
 
+    subgraph Core_App ["⚡ TutorKeybox Software"]
+        AE["AudioEngine<br>(Audio & MIDI Callback)"]
+        MS[("MidiState<br>(std::atomic Thread-Safe Bridge)")]
+        MC["MainComponent"]
+        MMV["MidiMonitorView<br>(30 Hz Developer Surveillance UI)"]
+    end
+
+    %% Flow Connections
+    MIDI_KB --> CORE_AUDIO
+    MIDI_KB --> ALSA_JACK
+    CORE_AUDIO --> JUCE_ADM
+    ALSA_JACK --> JUCE_ADM
+
+    JUCE_ADM -->|Incoming Raw MIDI Bytes| AE
+    AE -->|Writes noteOn / noteOff| MS
+    AE -->|Clears/Feeds Audio Buffers| SOUND_CARD
+
+    MS -.->|Atomic Reads at 30 Hz| MMV
+    MC -->|Contains| AE
+    MC -->|Contains| MMV
+
+4.2 Medium Level Summary (Thread & Execution Model)
+----------------------------------------------------------------------
+The system operates across two isolated CPU execution threads:
+1. Real-Time Audio Thread (AudioEngine):
+   - Triggered asynchronously by hardware interrupts when MIDI bytes arrive.
+   - Executes handleIncomingMidiMessage() without memory allocations or locks.
+   - Writes directly to std::atomic member variables in MidiState using 
+     std::memory_order_relaxed for zero CPU memory fencing stalls.
+2. Main Message Thread (GUI Thread - MidiMonitorView):
+   - Executes a 30 Hz juce::Timer callback (~33ms intervals).
+   - Atomically reads MidiState variables.
+   - Performs a state diff (compares cached lastNote vs new note).
+   - Triggers repaint() only when changes occur, rendering note names (e.g. "C4"), 
+     MIDI note integers, velocity meters, and active gate badges.
+
+MERMAID:
+sequenceDiagram
+    autonumber
+    participant HW as 🎹 MIDI Keyboard
+    participant AT as ⚡ Audio Thread (AudioEngine)
+    participant MS as 🔒 MidiState (std::atomic RAM)
+    participant GT as 🖥️ GUI Thread (MidiMonitorView)
+    participant SCR as 📺 Surveillance Screen
+
+    Note over AT: Real-Time Priority (Must NEVER block or lock!)
+    Note over GT: 30 Hz Timer Loop (Runs every ~33ms)
+
+    HW->>AT: Physical Key Pressed (NoteOn C4, Vel 0.85)
+    AT->>MS: noteOn(60, 0.85) via std::memory_order_relaxed
+    Note over MS: Atomic store (0 CPU memory stalls)
+
+    loop Every 33ms (30 Hz)
+        GT->>MS: load() active note & velocity
+        MS-->>GT: Returns (isNoteActive=true, note=60, vel=0.85)
+        alt State Changed?
+            GT->>GT: Calculate note name ("C4")
+            GT->>SCR: repaint() Gate Open, Note C4, Velocity 85%
+        end
+    end
+
+    HW->>AT: Physical Key Released (NoteOff C4)
+    AT->>MS: noteOff(60) via std::memory_order_relaxed
+    Note over MS: Atomic store (isNoteActive=false)
+
+    GT->>MS: load() active note
+    MS-->>GT: Returns (isNoteActive=false)
+    GT->>SCR: repaint() Standby ("Waiting for input...")
+
+4.3 JUCE specifics and how they fit in
+4.4 Portability (cross-platform)
+
+5. CORE FUNCTIONS & Build history doc
+100% Standalone IOS App+GUI, reads NoteOn, Velocity, pitch.
+100% JUCE inclusion
+0% Test on RaspberryPi
+0% Sustain pedal
+0% Hardware telemetry display
+0% Audio/MIDI Hardware Settings UI
+0% building a first instrument and playing sound out of the speakers
 

@@ -9,3 +9,8 @@ build/
 .idea/
 *.xcodeproj/
 *.xcworkspace/
+
+# Raw Audio Sample Libraries
+SalamanderGrandPiano-master/
+Samples/
+*.bin

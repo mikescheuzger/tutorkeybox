@@ -1,5 +1,7 @@
 #pragma once
 #include "../Core/MidiState.h"
+#include "../Synth/LayeredSynth.h"
+#include "../Synth/SampleContainerReader.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 
 class AudioEngine : public juce::AudioIODeviceCallback,
@@ -14,6 +16,7 @@ public:
   void shutdown();
 
   juce::AudioDeviceManager &getDeviceManager() { return deviceManager; }
+  LayeredSynth &getSynth() { return synth; }
 
   void handleIncomingMidiMessage(juce::MidiInput *source,
                                  const juce::MidiMessage &message) override;
@@ -29,6 +32,10 @@ public:
 private:
   MidiState &midiState;
   juce::AudioDeviceManager deviceManager;
+  LayeredSynth synth;
+
+  juce::MidiBuffer incomingMidiBuffer;
+  juce::CriticalSection midiLock;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioEngine);
 };

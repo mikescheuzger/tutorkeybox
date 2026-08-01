@@ -21,6 +21,14 @@ target_sources(TutorKeybox
         Source/GUI/MidiMonitorView.cpp
         Source/GUI/MainComponent.h
         Source/GUI/MainComponent.cpp
+        Source/Synth/SampleHeader.h
+        Source/Synth/CustomSamplerSound.h
+        Source/Synth/CustomSamplerVoice.h
+        Source/Synth/CustomSamplerVoice.cpp
+        Source/Synth/LayeredSynth.h
+        Source/Synth/LayeredSynth.cpp
+        Source/Synth/SampleContainerReader.h
+        Source/Synth/SampleContainerReader.cpp
 )
 
 target_link_libraries(TutorKeybox
@@ -41,3 +49,26 @@ target_link_libraries(TutorKeybox
 
 juce_generate_juce_header(TutorKeybox)
 
+# ==============================================================================
+# Standalone Command-Line Sample Packager Utility
+# ==============================================================================
+juce_add_console_app(TKBPackager
+    PRODUCT_NAME "TKBPackager"
+)
+
+target_sources(TKBPackager
+    PRIVATE
+        Tools/Packager.cpp
+        Source/Synth/SampleHeader.h
+)
+
+target_link_libraries(TKBPackager
+    PRIVATE
+        juce::juce_audio_formats
+        juce::juce_audio_basics
+        juce::juce_core
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_recommended_config_flags
+)

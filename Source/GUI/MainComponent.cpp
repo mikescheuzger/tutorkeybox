@@ -1,20 +1,19 @@
 #include "MainComponent.h"
 
-MainComponent::MainComponent() {
-  // Make the MIDI monitor view visible inside this main container
+MainComponent::MainComponent() : midiMonitorView(midiState, audioEngine) {
   addAndMakeVisible(midiMonitorView);
 
   // Initialize audio hardware and start listening for MIDI inputs
   audioEngine.initialize();
 
-  // Set initial window size
-  setSize(650, 300);
+  // Set 800x500 window size for 4-layer controls
+  setSize(800, 500);
 }
 
 MainComponent::~MainComponent() { audioEngine.shutdown(); }
 
 void MainComponent::paint(juce::Graphics &g) {
-  // Background fill
+  // Dark Background fill
   g.fillAll(juce::Colour(0xff121214));
 }
 

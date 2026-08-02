@@ -8,7 +8,7 @@ add_subdirectory(JUCE-master JUCE)
 
 juce_add_gui_app(TutorKeybox
     PRODUCT_NAME "TutorKeybox"
-    
+    ICON_BIG "Resources/AppIcon.icns"
 )
 
 target_sources(TutorKeybox
@@ -17,8 +17,12 @@ target_sources(TutorKeybox
         Source/Core/MidiState.h
         Source/Audio/AudioEngine.h
         Source/Audio/AudioEngine.cpp
-        Source/GUI/MidiMonitorView.h
-        Source/GUI/MidiMonitorView.cpp
+        Source/GUI/TelemetryHeaderView.h
+        Source/GUI/TelemetryHeaderView.cpp
+        Source/GUI/HardwareSelectorBar.h
+        Source/GUI/HardwareSelectorBar.cpp
+        Source/GUI/LayerCardComponent.h
+        Source/GUI/LayerCardComponent.cpp
         Source/GUI/MainComponent.h
         Source/GUI/MainComponent.cpp
         Source/Synth/SampleHeader.h
@@ -29,6 +33,8 @@ target_sources(TutorKeybox
         Source/Synth/LayeredSynth.cpp
         Source/Synth/SampleContainerReader.h
         Source/Synth/SampleContainerReader.cpp
+        Source/Synth/SamplePackager.h
+        Source/Synth/SamplePackager.cpp
 )
 
 target_link_libraries(TutorKeybox
@@ -60,6 +66,8 @@ target_sources(TKBPackager
     PRIVATE
         Tools/Packager.cpp
         Source/Synth/SampleHeader.h
+        Source/Synth/SamplePackager.h
+        Source/Synth/SamplePackager.cpp
 )
 
 target_link_libraries(TKBPackager

@@ -5,18 +5,21 @@ AudioEngine::AudioEngine(MidiState &stateToUpdate) : midiState(stateToUpdate) {}
 AudioEngine::~AudioEngine() { shutdown(); }
 
 void AudioEngine::initialize() {
-  // Initialize default audio output (0 inputs, 2 output channels for stereo
-  // speakers)
+  // 1. Initialize hardware soundcard
   deviceManager.initialiseWithDefaultDevices(0, 2);
-
-  // Register this class to receive audio callbacks
+  // 2. Set low latency buffer size (128 samples = ~3ms)
+  juce::AudioDeviceManager::AudioDeviceSetup setup;
+  deviceManager.getAudioDeviceSetup(setup);
+  setup.bufferSize = 128;
+  deviceManager.setAudioDeviceSetup(setup, true);
+  // 3. Register audio callback
   deviceManager.addAudioCallback(this);
-
-  // Automatically enable and listen to all connected MIDI input devices
+  // 4. Automatically enable and listen to EVERY connected MIDI input device!
   auto midiInputs = juce::MidiInput::getAvailableDevices();
   for (const auto &input : midiInputs) {
     deviceManager.setMidiInputDeviceEnabled(input.identifier, true);
     deviceManager.addMidiInputDeviceCallback(input.identifier, this);
+    juce::Logger::writeToLog("Connected MIDI Input Device: " + input.name);
   }
 }
 
@@ -34,15 +37,15 @@ void AudioEngine::shutdown() {
 void AudioEngine::handleIncomingMidiMessage(juce::MidiInput * /*source*/,
                                             const juce::MidiMessage &message) {
   if (message.isNoteOn()) {
+    juce::Logger::writeToLog("MIDI NOTE ON: " +
+                             juce::String(message.getNoteNumber()));
     midiState.noteOn(message.getNoteNumber(), message.getFloatVelocity());
   } else if (message.isNoteOff()) {
     midiState.noteOff(message.getNoteNumber());
   } else if (message.isController() && message.getControllerNumber() == 64) {
-    // 64 weil MIDI CC 64 Sustain Pedal ist
     bool pedalDown = (message.getControllerValue() >= 64);
     midiState.setSustainPedal(pedalDown);
   }
-
   // Queue MIDI message safely for real-time sound engine
   const juce::ScopedLock sl(midiLock);
   incomingMidiBuffer.addEvent(message, 0);

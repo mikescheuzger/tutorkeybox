@@ -1,5 +1,6 @@
 #include "MidiMonitorView.h"
 #include "../Synth/SampleContainerReader.h"
+#include "../Synth/SamplePackager.h"
 
 MidiMonitorView::MidiMonitorView(MidiState &stateToMonitor,
                                  AudioEngine &engineToControl)
@@ -78,15 +79,28 @@ void MidiMonitorView::filesDropped(const juce::StringArray &files, int x,
   int cardWidth = getWidth() / 4;
   int targetLayer = juce::jlimit(0, 3, x / juce::jmax(1, cardWidth));
   hoveredLayerIndex = -1;
-
   for (const auto &filePath : files) {
     juce::File file(filePath);
     if (file.getFileExtension().equalsIgnoreCase(".bin")) {
-      // Load .bin package file into target layer
+      // A. User dropped a .bin package file
       if (SampleContainerReader::loadContainerFile(file, audioEngine.getSynth(),
                                                    targetLayer)) {
         layerLoadedNames[targetLayer] = file.getFileNameWithoutExtension();
         repaint();
+      }
+    } else if (file.isDirectory() ||
+               file.getFileExtension().equalsIgnoreCase(".wav")) {
+      // B. User dropped a WAV folder! Auto-pack into a .bin package in
+      // background
+      juce::File tempBin =
+          juce::File::getSpecialLocation(juce::File::tempDirectory)
+              .getChildFile("Layer" + juce::String(targetLayer) + ".bin");
+      if (SamplePackager::createPackage(file, tempBin)) {
+        if (SampleContainerReader::loadContainerFile(
+                tempBin, audioEngine.getSynth(), targetLayer)) {
+          layerLoadedNames[targetLayer] = file.getFileNameWithoutExtension();
+          repaint();
+        }
       }
     }
   }
@@ -181,7 +195,7 @@ void MidiMonitorView::paint(juce::Graphics &g) {
 
     g.setColour(juce::Colour(0xff555566));
     g.setFont(juce::FontOptions(11.0f, juce::Font::italic));
-    g.drawText("[Drop .bin File Here]", cardBounds.removeFromBottom(20),
-               juce::Justification::centred);
+    g.drawText("[Drop .wav Folder or .bin Here]",
+               cardBounds.removeFromBottom(20), juce::Justification::centred);
   }
 }

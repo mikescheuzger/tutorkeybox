@@ -1,23 +1,41 @@
 #include "MainComponent.h"
 
-MainComponent::MainComponent() : midiMonitorView(midiState, audioEngine) {
-  addAndMakeVisible(midiMonitorView);
+MainComponent::MainComponent() {
+  addAndMakeVisible(telemetryHeader);
+  addAndMakeVisible(hardwareBar);
 
-  // Initialize audio hardware and start listening for MIDI inputs
+  addAndMakeVisible(layerCard0);
+  addAndMakeVisible(layerCard1);
+  addAndMakeVisible(layerCard2);
+  addAndMakeVisible(layerCard3);
+
+  // 1. Initialize audio hardware & MIDI inputs FIRST
   audioEngine.initialize();
 
-  // Set 800x500 window size for 4-layer controls
-  setSize(800, 500);
+  // 2. Populate dropdown choices NOW that hardware is initialized!
+  hardwareBar.updateDropdowns();
+
+  setSize(840, 520);
 }
 
 MainComponent::~MainComponent() { audioEngine.shutdown(); }
 
 void MainComponent::paint(juce::Graphics &g) {
-  // Dark Background fill
-  g.fillAll(juce::Colour(0xff121214));
+  g.fillAll(juce::Colour(0xff121216));
 }
 
 void MainComponent::resized() {
-  // Fill the window with our MIDI monitor view (with a 10px margin)
-  midiMonitorView.setBounds(getLocalBounds().reduced(10));
+  auto area = getLocalBounds().reduced(10);
+
+  auto topRow = area.removeFromTop(100);
+  hardwareBar.setBounds(topRow.removeFromRight(320));
+  telemetryHeader.setBounds(topRow);
+
+  area.removeFromTop(15);
+
+  int cardWidth = area.getWidth() / 4;
+  layerCard0.setBounds(area.removeFromLeft(cardWidth).reduced(5, 0));
+  layerCard1.setBounds(area.removeFromLeft(cardWidth).reduced(5, 0));
+  layerCard2.setBounds(area.removeFromLeft(cardWidth).reduced(5, 0));
+  layerCard3.setBounds(area.removeFromLeft(cardWidth).reduced(5, 0));
 }

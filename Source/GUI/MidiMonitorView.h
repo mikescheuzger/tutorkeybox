@@ -4,8 +4,8 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /**
- * Developer Surveillance Monitor & 4-Layer Control Interface.
- * Implements juce::FileDragAndDropTarget for drag-and-drop sample loading.
+ * Developer Surveillance Monitor, 4-Layer Control, Hardware Selector &
+ * Telemetry Center.
  */
 class MidiMonitorView : public juce::Component,
                         public juce::Timer,
@@ -26,8 +26,14 @@ public:
   void filesDropped(const juce::StringArray &files, int x, int y) override;
 
 private:
+  void updateHardwareDropdowns();
+
   MidiState &midiState;
   AudioEngine &audioEngine;
+
+  // Hardware Selector ComboBoxes
+  juce::ComboBox audioOutputSelector;
+  juce::ComboBox midiInputSelector;
 
   // GUI Controls per Layer
   std::array<juce::Slider, 4> volumeSliders;
@@ -35,6 +41,11 @@ private:
   std::array<juce::String, 4> layerLoadedNames{"Empty Layer", "Empty Layer",
                                                "Empty Layer", "Empty Layer"};
   int hoveredLayerIndex{-1};
+
+  // Telemetry Data Cache
+  double audioCpuUsage{0.0};
+  double systemCpuUsage{0.0};
+  int appRamUsageMB{0};
 
   int lastNote{-1};
   float lastVel{0.0f};

@@ -1,15 +1,17 @@
 #pragma once
 #include "../Audio/AudioEngine.h"
 #include "../Core/MidiState.h"
-#include "MidiMonitorView.h"
+#include "HardwareSelectorBar.h"
+#include "LayerCardComponent.h"
+#include "TelemetryHeaderView.h"
 #include <juce_gui_extra/juce_gui_extra.h>
 
 /**
- * Main application window component holding the AudioEngine and GUI Views.
+ * Master Application Container arranging modular sub-views.
  */
 class MainComponent : public juce::Component {
 public:
-  MainComponent(); // <-- 0 arguments
+  MainComponent();
   ~MainComponent() override;
 
   void paint(juce::Graphics &g) override;
@@ -18,8 +20,15 @@ public:
 private:
   MidiState midiState;
   AudioEngine audioEngine{midiState};
-  MidiMonitorView midiMonitorView{
-      midiState, audioEngine}; // <-- Pass both midiState and audioEngine
+
+  // Modular Sub-Views
+  TelemetryHeaderView telemetryHeader{midiState, audioEngine};
+  HardwareSelectorBar hardwareBar{audioEngine};
+
+  LayerCardComponent layerCard0{0, audioEngine};
+  LayerCardComponent layerCard1{1, audioEngine};
+  LayerCardComponent layerCard2{2, audioEngine};
+  LayerCardComponent layerCard3{3, audioEngine};
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

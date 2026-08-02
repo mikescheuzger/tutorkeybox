@@ -4,13 +4,17 @@ build/
 # macOS System Files
 .DS_Store
 
-# IDE & Editor folders
+# IDE & Language Server Caches
 .vscode/
 .idea/
+.cache/
 *.xcodeproj/
 *.xcworkspace/
 
-# Raw Audio Sample Libraries
+# Raw & Converted Audio Sample Libraries
 SalamanderGrandPiano-master/
+SalamanderGrandPianoWAVs/
+PianoWavs/
 Samples/
+Upright Samples_unbearbeitet/
 *.bin

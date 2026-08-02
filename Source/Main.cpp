@@ -11,7 +11,14 @@ public:
 
   const juce::String getApplicationName() override { return "TutorKeybox"; }
   const juce::String getApplicationVersion() override { return "1.0.0"; }
-  bool moreThanOneInstanceAllowed() override { return true; }
+  bool moreThanOneInstanceAllowed() override { return false; }
+
+  void anotherInstanceStarted(const juce::String & /*commandLine*/) override {
+    // Bring existing window to front if launched again
+    if (mainWindow != nullptr) {
+      mainWindow->toFront(true);
+    }
+  }
 
   // Called when the application starts
   void initialise(const juce::String & /*commandLine*/) override {
@@ -24,8 +31,6 @@ public:
   }
 
   void systemRequestedQuit() override { quit(); }
-
-  void anotherInstanceStarted(const juce::String & /*commandLine*/) override {}
 
   // ==============================================================================
   /**

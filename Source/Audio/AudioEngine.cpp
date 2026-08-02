@@ -1,7 +1,6 @@
 #include "AudioEngine.h"
-
-AudioEngine::AudioEngine(MidiState &stateToUpdate) : midiState(stateToUpdate) {}
-
+AudioEngine::AudioEngine(MidiState &stateToUpdate)
+    : midiState(stateToUpdate), synth(stateToUpdate) {}
 AudioEngine::~AudioEngine() { shutdown(); }
 
 void AudioEngine::initialize() {

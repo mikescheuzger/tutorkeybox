@@ -1,68 +1,114 @@
 #include "LayeredSynth.h"
 
-LayeredSynth::LayeredSynth() {
-  // Initialize 32 CustomSamplerVoice instances for each of the 4 layers (128
-  // voices total)
+LayeredSynth::LayeredSynth(MidiState &stateToUpdate)
+    : midiState(stateToUpdate) {
   for (int layerIdx = 0; layerIdx < NUM_LAYERS; ++layerIdx) {
     for (int v = 0; v < VOICES_PER_LAYER; ++v) {
-      layers[layerIdx].addVoice(new CustomSamplerVoice());
+      layers[layerIdx].synth.addVoice(new CustomSamplerVoice(&stateToUpdate));
     }
   }
 }
 
 void LayeredSynth::prepareToPlay(double sampleRate, int /*samplesPerBlock*/) {
   for (int layerIdx = 0; layerIdx < NUM_LAYERS; ++layerIdx) {
-    layers[layerIdx].setCurrentPlaybackSampleRate(sampleRate);
-  }
-}
-
-void LayeredSynth::addSoundToLayer(
-    int layerIndex, const juce::SynthesiserSound::Ptr &newSound) {
-  if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
-    layers[layerIndex].addSound(newSound);
-  }
-}
-
-void LayeredSynth::clearLayerSounds(int layerIndex) {
-  if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
-    layers[layerIndex].clearSounds();
-  }
-}
-
-void LayeredSynth::setLayerVolume(int layerIndex, float gain) {
-  if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
-    layerGains[layerIndex] = juce::jlimit(0.0f, 1.0f, gain);
-  }
-}
-
-void LayeredSynth::setLayerMuted(int layerIndex, bool mute) {
-  if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
-    layerMuted[layerIndex] = mute;
+    layers[layerIdx].synth.setCurrentPlaybackSampleRate(sampleRate);
   }
 }
 
 void LayeredSynth::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
-                                   const juce::MidiBuffer &midiMessages,
+                                   juce::MidiBuffer &midiMessages,
                                    int startSample, int numSamples) {
-  // Temporary audio buffer for rendering each layer independently
-  juce::AudioBuffer<float> layerBuffer(outputBuffer.getNumChannels(),
-                                       numSamples);
-
   for (int layerIdx = 0; layerIdx < NUM_LAYERS; ++layerIdx) {
-    // Skip muted layers
-    if (layerMuted[layerIdx] || layerGains[layerIdx] <= 0.001f)
+    auto &layer = layers[layerIdx];
+    if (layer.muted)
       continue;
 
-    layerBuffer.clear();
+    juce::MidiBuffer nonNoteOnMessages;
 
-    // Render layer's 32 voices
-    layers[layerIdx].renderNextBlock(layerBuffer, midiMessages, 0, numSamples);
+    for (const auto metadata : midiMessages) {
+      auto msg = metadata.getMessage();
+      if (msg.isNoteOn()) {
+        int note = msg.getNoteNumber();
+        int velInt = juce::roundToInt(msg.getFloatVelocity() * 127.0f);
 
-    // Apply layer volume gain
-    float gain = layerGains[layerIdx];
-    for (int ch = 0; ch < outputBuffer.getNumChannels(); ++ch) {
-      outputBuffer.addFrom(ch, startSample, layerBuffer, ch, 0, numSamples,
-                           gain);
+        // Find the SINGLE matching sound for pitch AND velocity!
+        juce::SynthesiserSound::Ptr matchingSound = nullptr;
+        for (int s = 0; s < layer.synth.getNumSounds(); ++s) {
+          auto snd = layer.synth.getSound(s);
+          if (auto *cs = const_cast<CustomSamplerSound *>(
+                  dynamic_cast<const CustomSamplerSound *>(snd.get()))) {
+            if (cs->appliesToNote(note) && cs->appliesToVelocity(velInt)) {
+              matchingSound = snd;
+              break;
+            }
+          }
+        }
+
+        if (matchingSound != nullptr) {
+          // Find a free or oldest voice on this layer synth
+          juce::SynthesiserVoice *voiceToUse = nullptr;
+          for (int v = 0; v < layer.synth.getNumVoices(); ++v) {
+            auto *vPtr = layer.synth.getVoice(v);
+            if (!vPtr->isVoiceActive()) {
+              voiceToUse = vPtr;
+              break;
+            }
+          }
+          if (voiceToUse == nullptr && layer.synth.getNumVoices() > 0) {
+            voiceToUse = layer.synth.getVoice(0); // Reuse voice 0 if all busy
+          }
+
+          if (voiceToUse != nullptr) {
+            layer.synth.triggerVoice(voiceToUse, matchingSound.get(),
+                                     msg.getChannel(), note, msg.getFloatVelocity());
+          }
+        }
+      } else {
+        nonNoteOnMessages.addEvent(msg, metadata.samplePosition);
+      }
     }
+
+    juce::AudioBuffer<float> tempBuffer(outputBuffer.getNumChannels(),
+                                        numSamples);
+    tempBuffer.clear();
+
+    // Render audio and non-NoteOn messages (Note Off, Sustain Pedal, etc.)
+    layer.synth.renderNextBlock(tempBuffer, nonNoteOnMessages, 0, numSamples);
+
+    for (int ch = 0; ch < outputBuffer.getNumChannels(); ++ch) {
+      outputBuffer.addFrom(ch, startSample, tempBuffer, ch, 0, numSamples,
+                           layer.volumeGain);
+    }
+  }
+}
+
+void LayeredSynth::addSoundToLayer(int layerIndex,
+                                   juce::SynthesiserSound::Ptr sound) {
+  if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
+    layers[layerIndex].synth.addSound(sound);
+  }
+}
+
+void LayeredSynth::clearLayer(int layerIndex) {
+  if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
+    layers[layerIndex].synth.clearSounds();
+  }
+}
+
+void LayeredSynth::clearAllLayers() {
+  for (int layerIdx = 0; layerIdx < NUM_LAYERS; ++layerIdx) {
+    layers[layerIdx].synth.clearSounds();
+  }
+}
+
+void LayeredSynth::setLayerVolume(int layerIndex, float gainLinear) {
+  if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
+    layers[layerIndex].volumeGain = gainLinear;
+  }
+}
+
+void LayeredSynth::setLayerMute(int layerIndex, bool isMuted) {
+  if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
+    layers[layerIndex].muted = isMuted;
   }
 }

@@ -1,6 +1,7 @@
 #include "CustomSamplerVoice.h"
 
-CustomSamplerVoice::CustomSamplerVoice() {}
+CustomSamplerVoice::CustomSamplerVoice(MidiState *stateToUpdate)
+    : midiState(stateToUpdate) {}
 
 bool CustomSamplerVoice::canPlaySound(juce::SynthesiserSound *sound) {
   return dynamic_cast<const CustomSamplerSound *>(sound) != nullptr;
@@ -10,6 +11,12 @@ void CustomSamplerVoice::startNote(int midiNoteNumber, float velocity,
                                    juce::SynthesiserSound *sound,
                                    int /*currentPitchWheelPosition*/) {
   if (auto *samplerSound = dynamic_cast<const CustomSamplerSound *>(sound)) {
+    int velInt = juce::roundToInt(velocity * 127.0f);
+    if (!samplerSound->appliesToVelocity(velInt)) {
+      clearCurrentNote();
+      return;
+    }
+
     double noteHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
     double rootHz = juce::MidiMessage::getMidiNoteInHertz(
         samplerSound->getEntry().rootNote);
@@ -23,24 +30,17 @@ void CustomSamplerVoice::startNote(int midiNoteNumber, float velocity,
     }
 
     sourceSamplePosition = 0.0;
-    lgain = velocity;
-    rgain = velocity;
+    lgain = 1.0f;
+    rgain = 1.0f;
     isReleasing = false;
     releaseFactor = 1.0f;
     attackRamp = 0.0f;
 
-    // Create Zero-Copy Memory-Mapped Reader for the sample tail
-    tailReader.reset();
-    auto mappedFile = samplerSound->getMappedFile();
     const auto &entry = samplerSound->getEntry();
-
-    if (mappedFile != nullptr && mappedFile->getData() != nullptr &&
-        entry.wavDataSize > 0) {
-      const char *wavBytes =
-          static_cast<const char *>(mappedFile->getData()) + entry.fileOffset;
-      auto memStream = std::make_unique<juce::MemoryInputStream>(
-          wavBytes, entry.wavDataSize, false);
-      tailReader.reset(wavFormat.createReaderFor(memStream.release(), true));
+    if (midiState != nullptr) {
+      midiState->updateSampleInspector(entry.name, entry.rootNote, entry.keyLow,
+                                       entry.keyHigh, entry.velLow,
+                                       entry.velHigh);
     }
   } else {
     jassertfalse;
@@ -72,6 +72,10 @@ void CustomSamplerVoice::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
   const int attackNumSamples = attackBuffer.getNumSamples();
   const float *const *inChannels = attackBuffer.getArrayOfReadPointers();
 
+  const auto &tailBuffer = currentSound->getTailBuffer();
+  const int tailNumSamples = tailBuffer.getNumSamples();
+  const float *const *tailChannels = tailBuffer.getArrayOfReadPointers();
+
   float *outL = outputBuffer.getWritePointer(0, startSample);
   float *outR = outputBuffer.getNumChannels() > 1
                     ? outputBuffer.getWritePointer(1, startSample)
@@ -83,39 +87,23 @@ void CustomSamplerVoice::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
     float sampleL = 0.0f;
     float sampleR = 0.0f;
 
-    if (posInt < attackNumSamples - 1) {
-      // 1. PLAY FROM 150ms RAM ATTACK BUFFER
-      sampleL = inChannels[0][posInt] +
-                alpha * (inChannels[0][posInt + 1] - inChannels[0][posInt]);
+    if (posInt < tailNumSamples - 1) {
+      sampleL = tailChannels[0][posInt] +
+                alpha * (tailChannels[0][posInt + 1] - tailChannels[0][posInt]);
       sampleR =
-          (attackBuffer.getNumChannels() > 1)
-              ? inChannels[1][posInt] +
-                    alpha * (inChannels[1][posInt + 1] - inChannels[1][posInt])
+          (tailBuffer.getNumChannels() > 1)
+              ? tailChannels[1][posInt] + alpha * (tailChannels[1][posInt + 1] -
+                                                   tailChannels[1][posInt])
               : sampleL;
-    } else if (tailReader != nullptr &&
-               posInt < tailReader->lengthInSamples - 1) {
-      // 2. SEAMLESS ZERO-COPY TAIL STREAMING (Memory-Mapped Pointer)
-      float tempL[2] = {0.0f, 0.0f};
-      float tempR[2] = {0.0f, 0.0f};
-      float *destChannels[2] = {tempL, tempR};
-      juce::AudioBuffer<float> tempBuf(destChannels, 2, 2);
-
-      tailReader->read(&tempBuf, 0, 2, posInt, true, true);
-      sampleL = tempL[0] + alpha * (tempL[1] - tempL[0]);
-      sampleR = (tailReader->numChannels > 1)
-                    ? (tempR[0] + alpha * (tempR[1] - tempR[0]))
-                    : sampleL;
     } else {
       clearCurrentNote();
       break;
     }
 
-    // Anti-click 2ms smooth fade-in ramp
     if (attackRamp < 1.0f) {
-      attackRamp += 0.005f;
+      attackRamp += 0.05f;
     }
 
-    // Smooth release envelope decay
     if (isReleasing) {
       releaseFactor *= 0.9992f;
       if (releaseFactor < 0.001f) {

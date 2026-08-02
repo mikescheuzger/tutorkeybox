@@ -1,11 +1,13 @@
 #pragma once
+#include "../Core/MidiState.h"
 #include "CustomSamplerSound.h"
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 
 class CustomSamplerVoice : public juce::SynthesiserVoice {
 public:
-  CustomSamplerVoice();
+  explicit CustomSamplerVoice(MidiState *stateToUpdate = nullptr);
+
   ~CustomSamplerVoice() override = default;
 
   bool canPlaySound(juce::SynthesiserSound *sound) override;
@@ -19,6 +21,8 @@ public:
                        int numSamples) override;
 
 private:
+  MidiState *midiState{nullptr};
+
   double pitchRatio{0.0};
   double sourceSamplePosition{0.0};
   float lgain{0.0f};

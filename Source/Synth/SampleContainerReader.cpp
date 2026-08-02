@@ -49,34 +49,54 @@ bool SampleContainerReader::loadContainerFile(const juce::File &binFile,
     indexTable.push_back(entry);
   }
 
-  // 4. Memory-map the container file for zero-copy tail streaming
-  auto memoryMap = std::make_shared<juce::MemoryMappedFile>(
-      binFile, juce::MemoryMappedFile::readOnly);
+  // 4. Load the entire .bin file into memory ONCE (0 disk file descriptor exhaustion!)
+  juce::MemoryBlock binData;
+  if (!binFile.loadFileAsData(binData) || binData.getSize() == 0) {
+    juce::Logger::writeToLog("SampleContainerReader Error: Failed to load .bin data block.");
+    return false;
+  }
+
   juce::WavAudioFormat wavFormat;
+
   for (const auto &entry : indexTable) {
-    // Seek to the exact byte offset of the WAV sample inside the .bin file
-    stream.setPosition(entry.fileOffset);
-    // Create a sub-region stream pointing to this WAV data block
-    auto subStream = std::make_unique<juce::SubregionStream>(
-        new juce::FileInputStream(binFile), entry.fileOffset, entry.wavDataSize,
-        true);
+    if (entry.fileOffset + entry.wavDataSize > binData.getSize())
+      continue;
+
+    // Create zero-copy memory stream pointing to this WAV sample block
+    auto memStream = std::make_unique<juce::MemoryInputStream>(
+        static_cast<const char *>(binData.getData()) + entry.fileOffset,
+        entry.wavDataSize, false);
+
     std::unique_ptr<juce::AudioFormatReader> reader(
-        wavFormat.createReaderFor(subStream.release(), true));
+        wavFormat.createReaderFor(memStream.release(), true));
+
     if (reader != nullptr) {
+      // 1. Read Full Sample Float Buffer (Clean 24-bit PCM decoding from memory!)
+      juce::AudioBuffer<float> tailBuffer((int)reader->numChannels,
+                                          (int)reader->lengthInSamples);
+      reader->read(&tailBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
+
+      // 2. Create Attack RAM Buffer (First 150ms slice)
       int samplesToRead =
           (entry.attackSampleSize > 0)
               ? (int)entry.attackSampleSize
               : juce::jmin((int)reader->lengthInSamples,
                            juce::roundToInt(0.150 * reader->sampleRate));
+
       juce::AudioBuffer<float> attackRamBuffer((int)reader->numChannels,
                                                samplesToRead);
-      reader->read(&attackRamBuffer, 0, samplesToRead, 0, true, true);
+      for (int ch = 0; ch < reader->numChannels; ++ch) {
+        attackRamBuffer.copyFrom(ch, 0, tailBuffer, ch, 0, samplesToRead);
+      }
+
       int targetLayer = (targetLayerIndex >= 0 && targetLayerIndex <= 3)
                             ? targetLayerIndex
                             : entry.layerIndex;
-      // Create CustomSamplerSound object with memoryMap reference
+
+      // Create CustomSamplerSound object with both decoded float buffers
       juce::SynthesiserSound::Ptr sound = new CustomSamplerSound(
-          entry, attackRamBuffer, reader->sampleRate, memoryMap);
+          entry, attackRamBuffer, tailBuffer, reader->sampleRate);
+
       synthTarget.addSoundToLayer(targetLayer, sound);
     }
   }

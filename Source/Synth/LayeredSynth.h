@@ -1,42 +1,47 @@
 #pragma once
+#include "../Core/MidiState.h"
 #include "CustomSamplerSound.h"
 #include "CustomSamplerVoice.h"
 #include <juce_audio_basics/juce_audio_basics.h>
 
-/**
- * 4-Layer Polyphonic Synthesizer Engine (128 total voices).
- */
+class LayerSynthesiser : public juce::Synthesiser {
+public:
+  void triggerVoice(juce::SynthesiserVoice *voice, juce::SynthesiserSound *sound,
+                    int midiChannel, int midiNoteNumber, float velocity) {
+    startVoice(voice, sound, midiChannel, midiNoteNumber, velocity);
+  }
+};
+
 class LayeredSynth {
 public:
+  explicit LayeredSynth(MidiState &stateToUpdate);
+  ~LayeredSynth() = default;
+
+  void prepareToPlay(double sampleRate, int samplesPerBlock);
+  void renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
+                       juce::MidiBuffer &midiMessages, int startSample,
+                       int numSamples);
+
+  void addSoundToLayer(int layerIndex, juce::SynthesiserSound::Ptr sound);
+  void clearLayer(int layerIndex);
+  void clearAllLayers();
+
+  void setLayerVolume(int layerIndex, float gainLinear);
+  void setLayerMute(int layerIndex, bool isMuted);
+  void setLayerMuted(int layerIndex, bool isMuted) {
+    setLayerMute(layerIndex, isMuted);
+  } // Alias
+
+private:
+  MidiState &midiState;
   static constexpr int NUM_LAYERS = 4;
   static constexpr int VOICES_PER_LAYER = 32;
 
-  LayeredSynth();
-  ~LayeredSynth() = default;
+  struct Layer {
+    LayerSynthesiser synth;
+    float volumeGain{1.0f};
+    bool muted{false};
+  };
 
-  // Prepare sample rate & buffer size for all 4 layers
-  void prepareToPlay(double sampleRate, int samplesPerBlock);
-
-  // Add a sound sample to a specific layer (0 - 3)
-  void addSoundToLayer(int layerIndex,
-                       const juce::SynthesiserSound::Ptr &newSound);
-
-  // Clear all sounds from a specific layer
-  void clearLayerSounds(int layerIndex);
-
-  // Layer Controls: Volume (0.0 to 1.0) and Mute
-  void setLayerVolume(int layerIndex, float gain);
-  void setLayerMuted(int layerIndex, bool mute);
-
-  // Real-Time Audio Rendering (Renders all 4 layers and mixes audio)
-  void renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
-                       const juce::MidiBuffer &midiMessages, int startSample,
-                       int numSamples);
-
-private:
-  std::array<juce::Synthesiser, NUM_LAYERS> layers;
-  std::array<float, NUM_LAYERS> layerGains{1.0f, 1.0f, 1.0f, 1.0f};
-  std::array<bool, NUM_LAYERS> layerMuted{false, false, false, false};
-
-  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LayeredSynth)
+  std::array<Layer, NUM_LAYERS> layers;
 };

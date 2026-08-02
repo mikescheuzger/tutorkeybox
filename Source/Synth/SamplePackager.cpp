@@ -181,16 +181,9 @@ bool SamplePackager::createPackage(const juce::File &inputWavDir,
     if (it != uniqueRoots.end()) {
       size_t idx = std::distance(uniqueRoots.begin(), it);
       uint8_t prevRoot = (idx == 0) ? 0 : uniqueRoots[idx - 1];
-      uint8_t nextRoot =
-          (idx == uniqueRoots.size() - 1) ? 127 : uniqueRoots[idx + 1];
-
-      entry.keyLow =
-          (idx == 0) ? 0 : (uint8_t)((prevRoot + entry.rootNote) / 2 + 1);
-      entry.keyHigh = (idx == uniqueRoots.size() - 1)
-                          ? 127
-                          : (uint8_t)((entry.rootNote + nextRoot) / 2);
-    } else {
-      entry.keyLow = entry.rootNote;
+      // Pitch DOWN ONLY: Highest key is rootNote itself, keyLow extends
+      // downwards!
+      entry.keyLow = (idx == 0) ? 0 : (uint8_t)(prevRoot + 1);
       entry.keyHigh = entry.rootNote;
     }
   }

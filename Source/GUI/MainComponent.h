@@ -4,7 +4,7 @@
 #include "HardwareSelectorBar.h"
 #include "LayerCardComponent.h"
 #include "TelemetryHeaderView.h"
-#include <juce_gui_extra/juce_gui_extra.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 
 /**
  * Master Application Container arranging modular sub-views.

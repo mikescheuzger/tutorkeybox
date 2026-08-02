@@ -59,8 +59,13 @@ target_link_libraries(TutorKeybox
         juce::juce_events
         juce::juce_graphics
         juce::juce_gui_basics
-        juce::juce_gui_extra
         juce::juce_recommended_config_flags
+)
+
+target_compile_definitions(TutorKeybox
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
 )
 
 juce_generate_juce_header(TutorKeybox)

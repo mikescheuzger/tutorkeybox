@@ -95,3 +95,9 @@ target_link_libraries(TKBPackager
         juce::juce_gui_basics
         juce::juce_recommended_config_flags
 )
+
+target_compile_definitions(TKBPackager
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+)

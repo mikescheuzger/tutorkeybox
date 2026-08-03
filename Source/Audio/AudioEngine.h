@@ -18,6 +18,9 @@ public:
   juce::AudioDeviceManager &getDeviceManager() { return deviceManager; }
   LayeredSynth &getSynth() { return synth; }
 
+  float getCpuUsage() const { return (float)deviceManager.getCpuUsage(); }
+  int getActiveVoiceCount() const { return 0; }
+
   void handleIncomingMidiMessage(juce::MidiInput *source,
                                  const juce::MidiMessage &message) override;
 

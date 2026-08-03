@@ -45,6 +45,13 @@ target_sources(TutorKeybox
         Source/Synth/SampleContainerReader.cpp
         Source/Synth/SamplePackager.h
         Source/Synth/SamplePackager.cpp
+        Source/Core/PresetManager.h
+        Source/Core/PresetManager.cpp
+        Source/Network/NetworkProtocol.h
+        Source/Network/DeployClient.h
+        Source/Network/DeployClient.cpp
+        Source/GUI/DeployControlBar.h
+        Source/GUI/DeployControlBar.cpp
 )
 
 target_link_libraries(TutorKeybox
@@ -97,6 +104,55 @@ target_link_libraries(TKBPackager
 )
 
 target_compile_definitions(TKBPackager
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+)
+
+# ==============================================================================
+# Headless Audio Engine Core (Raspberry Pi 5 Daemon - 0% GUI Overhead)
+# ==============================================================================
+juce_add_console_app(TutorKeyboxCore
+    PRODUCT_NAME "TutorKeyboxCore"
+)
+
+target_sources(TutorKeyboxCore
+    PRIVATE
+        Source/Core/HeadlessMain.cpp
+        Source/Core/MidiState.h
+        Source/Audio/AudioEngine.h
+        Source/Audio/AudioEngine.cpp
+        Source/Synth/SampleHeader.h
+        Source/Synth/CustomSamplerSound.h
+        Source/Synth/CustomSamplerVoice.h
+        Source/Synth/CustomSamplerVoice.cpp
+        Source/Synth/LayeredSynth.h
+        Source/Synth/LayeredSynth.cpp
+        Source/Synth/SampleContainerReader.h
+        Source/Synth/SampleContainerReader.cpp
+        Source/Synth/SamplePackager.h
+        Source/Synth/SamplePackager.cpp
+        Source/Network/NetworkProtocol.h
+        Source/Network/NetworkServer.h
+        Source/Network/NetworkServer.cpp
+)
+
+target_link_libraries(TutorKeyboxCore
+    PRIVATE
+        juce::juce_audio_basics
+        juce::juce_audio_devices
+        juce::juce_audio_formats
+        juce::juce_audio_processors
+        juce::juce_audio_utils
+        juce::juce_core
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_recommended_config_flags
+)
+
+target_compile_definitions(TutorKeyboxCore
     PRIVATE
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0

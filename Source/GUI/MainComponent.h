@@ -1,6 +1,8 @@
 #pragma once
 #include "../Audio/AudioEngine.h"
 #include "../Core/MidiState.h"
+#include "../Core/PresetManager.h"
+#include "DeployControlBar.h"
 #include "HardwareSelectorBar.h"
 #include "LayerCardComponent.h"
 #include "TelemetryHeaderView.h"
@@ -21,7 +23,13 @@ private:
   MidiState midiState;
   AudioEngine audioEngine{midiState};
 
+#include "../Core/PresetManager.h"
+#include "DeployControlBar.h"
+
+  PresetManager presetManager;
+
   // Modular Sub-Views
+  DeployControlBar deployBar{presetManager};
   TelemetryHeaderView telemetryHeader{midiState, audioEngine};
   HardwareSelectorBar hardwareBar{audioEngine};
 

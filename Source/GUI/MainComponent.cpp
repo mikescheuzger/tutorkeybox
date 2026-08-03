@@ -1,6 +1,7 @@
 #include "MainComponent.h"
 
 MainComponent::MainComponent() {
+  addAndMakeVisible(deployBar);
   addAndMakeVisible(telemetryHeader);
   addAndMakeVisible(hardwareBar);
 
@@ -15,7 +16,7 @@ MainComponent::MainComponent() {
   // 2. Populate dropdown choices NOW that hardware is initialized!
   hardwareBar.updateDropdowns();
 
-  setSize(840, 520);
+  setSize(840, 560);
 }
 
 MainComponent::~MainComponent() { audioEngine.shutdown(); }
@@ -26,6 +27,9 @@ void MainComponent::paint(juce::Graphics &g) {
 
 void MainComponent::resized() {
   auto area = getLocalBounds().reduced(10);
+
+  deployBar.setBounds(area.removeFromTop(36));
+  area.removeFromTop(10);
 
   auto topRow = area.removeFromTop(100);
   hardwareBar.setBounds(topRow.removeFromRight(320));

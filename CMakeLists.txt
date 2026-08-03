@@ -33,8 +33,24 @@ target_sources(TutorKeybox
         Source/GUI/HardwareSelectorBar.cpp
         Source/GUI/LayerCardComponent.h
         Source/GUI/LayerCardComponent.cpp
+        Source/GUI/ChannelStripComponent.h
+        Source/GUI/ChannelStripComponent.cpp
+        Source/GUI/SamplerWindow.h
+        Source/GUI/SamplerWindow.cpp
+        Source/GUI/ReverbWindow.h
+        Source/GUI/ReverbWindow.cpp
+        Source/GUI/FilterWindow.h
+        Source/GUI/FilterWindow.cpp
+        Source/GUI/MidiMappingDrawer.h
+        Source/GUI/MidiMappingDrawer.cpp
+        Source/GUI/VelocityCurveEditor.h
+        Source/GUI/VelocityCurveEditor.cpp
         Source/GUI/MainComponent.h
         Source/GUI/MainComponent.cpp
+        Source/Audio/ConvolutionReverbEngine.h
+        Source/Audio/ConvolutionReverbEngine.cpp
+        Source/Audio/PerLayerFilter.h
+        Source/Audio/PerLayerFilter.cpp
         Source/Synth/SampleHeader.h
         Source/Synth/CustomSamplerSound.h
         Source/Synth/CustomSamplerVoice.h
@@ -47,7 +63,13 @@ target_sources(TutorKeybox
         Source/Synth/SamplePackager.cpp
         Source/Core/PresetManager.h
         Source/Core/PresetManager.cpp
+        Source/Core/LibraryManager.h
+        Source/Core/LibraryManager.cpp
+        Source/Core/MidiRouter.h
+        Source/Core/MidiRouter.cpp
         Source/Network/NetworkProtocol.h
+        Source/Network/NetworkMidiReceiver.h
+        Source/Network/NetworkMidiReceiver.cpp
         Source/Network/DeployClient.h
         Source/Network/DeployClient.cpp
         Source/GUI/DeployControlBar.h
@@ -63,6 +85,7 @@ target_link_libraries(TutorKeybox
         juce::juce_audio_utils
         juce::juce_core
         juce::juce_data_structures
+        juce::juce_dsp
         juce::juce_events
         juce::juce_graphics
         juce::juce_gui_basics
@@ -98,7 +121,6 @@ target_link_libraries(TKBPackager
         juce::juce_audio_basics
         juce::juce_core
         juce::juce_events
-        juce::juce_graphics
         juce::juce_gui_basics
         juce::juce_recommended_config_flags
 )
@@ -122,6 +144,10 @@ target_sources(TutorKeyboxCore
         Source/Core/MidiState.h
         Source/Audio/AudioEngine.h
         Source/Audio/AudioEngine.cpp
+        Source/Audio/ConvolutionReverbEngine.h
+        Source/Audio/ConvolutionReverbEngine.cpp
+        Source/Audio/PerLayerFilter.h
+        Source/Audio/PerLayerFilter.cpp
         Source/Synth/SampleHeader.h
         Source/Synth/CustomSamplerSound.h
         Source/Synth/CustomSamplerVoice.h
@@ -132,6 +158,12 @@ target_sources(TutorKeyboxCore
         Source/Synth/SampleContainerReader.cpp
         Source/Synth/SamplePackager.h
         Source/Synth/SamplePackager.cpp
+        Source/Core/PresetManager.h
+        Source/Core/PresetManager.cpp
+        Source/Core/LibraryManager.h
+        Source/Core/LibraryManager.cpp
+        Source/Core/MidiRouter.h
+        Source/Core/MidiRouter.cpp
         Source/Network/NetworkProtocol.h
         Source/Network/NetworkServer.h
         Source/Network/NetworkServer.cpp
@@ -143,12 +175,10 @@ target_link_libraries(TutorKeyboxCore
         juce::juce_audio_devices
         juce::juce_audio_formats
         juce::juce_audio_processors
-        juce::juce_audio_utils
         juce::juce_core
         juce::juce_data_structures
+        juce::juce_dsp
         juce::juce_events
-        juce::juce_graphics
-        juce::juce_gui_basics
         juce::juce_recommended_config_flags
 )
 

@@ -4,7 +4,11 @@
 #include <juce_core/juce_core.h>
 
 int main(int argc, char *argv[]) {
-  juce::initialiseJuce_GUI();
+  // CORE CONCEPT: On headless Linux (RasPi), initialiseJuce_GUI is not
+  // available without a display. Instead, we manually create the
+  // MessageManager so JUCE's timer/event infrastructure is available
+  // without requiring any windowing system.
+  juce::MessageManager::getInstance();
 
   juce::Logger::writeToLog("==========================================");
   juce::Logger::writeToLog("  TutorKeybox Core (Headless Audio Engine)");
@@ -37,6 +41,6 @@ int main(int argc, char *argv[]) {
 
   server.stopServer();
   audioEngine.shutdown();
-  juce::shutdownJuce_GUI();
+  juce::MessageManager::deleteInstance();
   return 0;
 }

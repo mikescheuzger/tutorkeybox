@@ -45,9 +45,12 @@ void AudioEngine::handleIncomingMidiMessage(juce::MidiInput * /*source*/,
     midiState.noteOn(message.getNoteNumber(), message.getFloatVelocity());
   } else if (message.isNoteOff()) {
     midiState.noteOff(message.getNoteNumber());
-  } else if (message.isController() && message.getControllerNumber() == 64) {
-    bool pedalDown = (message.getControllerValue() >= 64);
-    midiState.setSustainPedal(pedalDown);
+  } else if (message.isController()) {
+    if (message.getControllerNumber() == 64) {
+      bool pedalDown = (message.getControllerValue() >= 64);
+      midiState.setSustainPedal(pedalDown);
+    }
+    midiRouter.processMidiCc(message);
   }
   // Queue MIDI message safely for real-time sound engine
   const juce::ScopedLock sl(midiLock);
@@ -55,10 +58,12 @@ void AudioEngine::handleIncomingMidiMessage(juce::MidiInput * /*source*/,
 }
 
 void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice *device) {
-  // Will be used later when we prepare our sound sample engine
   if (device != nullptr) {
     synth.prepareToPlay(device->getCurrentSampleRate(),
                         device->getCurrentBufferSizeSamples());
+    reverbEngine.prepare(device->getCurrentSampleRate(),
+                         device->getCurrentBufferSizeSamples(),
+                         device->getActiveOutputChannels().countNumberOfSetBits());
   }
 }
 
@@ -83,4 +88,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
   }
   // 3. Render 4-layer polyphonic synth audio directly to speakers!
   synth.renderNextBlock(buffer, midiMessagesToProcess, 0, numSamples);
+
+  // 4. Render post-fader convolution reverb effect
+  reverbEngine.process(buffer);
 }

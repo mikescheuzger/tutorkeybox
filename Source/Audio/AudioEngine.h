@@ -1,4 +1,6 @@
 #pragma once
+#include "ConvolutionReverbEngine.h"
+#include "../Core/MidiRouter.h"
 #include "../Core/MidiState.h"
 #include "../Synth/LayeredSynth.h"
 #include "../Synth/SampleContainerReader.h"
@@ -16,7 +18,15 @@ public:
   void shutdown();
 
   juce::AudioDeviceManager &getDeviceManager() { return deviceManager; }
+
+  // CORE CONCEPT: Returns reference to polyphonic 4-layer synthesis engine.
   LayeredSynth &getSynth() { return synth; }
+
+  // CORE CONCEPT: Returns reference to real-time MIDI CC router and mapping engine.
+  MidiRouter &getMidiRouter() { return midiRouter; }
+
+  // CORE CONCEPT: Returns reference to post-fader convolution reverb engine.
+  ConvolutionReverbEngine &getReverbEngine() { return reverbEngine; }
 
   float getCpuUsage() const { return (float)deviceManager.getCpuUsage(); }
   int getActiveVoiceCount() const { return 0; }
@@ -36,6 +46,8 @@ private:
   MidiState &midiState;
   juce::AudioDeviceManager deviceManager;
   LayeredSynth synth;
+  MidiRouter midiRouter{synth};
+  ConvolutionReverbEngine reverbEngine;
 
   juce::MidiBuffer incomingMidiBuffer;
   juce::CriticalSection midiLock;

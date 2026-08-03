@@ -24,7 +24,20 @@ bool NetworkServer::startServer(int port) {
 void NetworkServer::stopServer() {
   isRunning = false;
   socket.shutdown();
+  midiForwardSocket.shutdown();
   stopThread(1000);
+}
+
+// CORE CONCEPT: Broadcasts a live MIDI message to connected Mac GUI clients via UDP MidiForwardPacket.
+void NetworkServer::broadcastMidiMessage(const juce::MidiMessage &message) {
+  if (clientAddress.toString().isEmpty() || message.getRawDataSize() == 0) return;
+
+  NetworkProtocol::MidiForwardPacket packet{};
+  packet.status = (uint8_t)message.getRawData()[0];
+  packet.data1  = message.getRawDataSize() > 1 ? (uint8_t)message.getRawData()[1] : 0;
+  packet.data2  = message.getRawDataSize() > 2 ? (uint8_t)message.getRawData()[2] : 0;
+
+  midiForwardSocket.write(clientAddress.toString(), NetworkProtocol::MIDI_PORT, &packet, sizeof(packet));
 }
 
 void NetworkServer::run() {

@@ -11,6 +11,8 @@ public:
   bool startServer(int port = NetworkProtocol::DEFAULT_PORT);
   void stopServer();
 
+  void broadcastMidiMessage(const juce::MidiMessage &message);
+
   void run() override;
 
 private:
@@ -22,5 +24,6 @@ private:
   juce::IPAddress clientAddress{juce::IPAddress::any()};
   int clientPort{0};
 
+  uint32_t lastTelemetryTime{0}; // Tracks 200ms throttle interval
   void sendTelemetry();
 };

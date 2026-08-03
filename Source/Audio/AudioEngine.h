@@ -2,6 +2,7 @@
 #include "../Core/MidiState.h"
 #include "../Synth/LayeredSynth.h"
 #include "../Synth/SampleContainerReader.h"
+#include <functional>
 #include <juce_audio_devices/juce_audio_devices.h>
 
 class AudioEngine : public juce::AudioIODeviceCallback,
@@ -12,9 +13,14 @@ public:
   explicit AudioEngine(MidiState &stateToUpdate);
   ~AudioEngine() override;
 
-  void initialize();
+  bool initialize();
   void shutdown();
+  bool setBufferSize(int newBufferSize);
 
+  bool isAudioOK() const { return audioDeviceOK; }
+  juce::String getActiveAudioDeviceName() const;
+
+  std::function<void(const juce::MidiMessage &)> onMidiMessageReceived;
   juce::AudioDeviceManager &getDeviceManager() { return deviceManager; }
   LayeredSynth &getSynth() { return synth; }
 
@@ -36,7 +42,7 @@ private:
   MidiState &midiState;
   juce::AudioDeviceManager deviceManager;
   LayeredSynth synth;
-
+  bool audioDeviceOK{false};
   juce::MidiBuffer incomingMidiBuffer;
   juce::CriticalSection midiLock;
 

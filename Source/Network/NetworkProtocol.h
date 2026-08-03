@@ -9,10 +9,28 @@ enum class PacketType : uint8_t {
   TelemetryUpdate = 0x01,
   ControlCommand = 0x02,
   SampleInspector = 0x03,
-  LoadContainer = 0x04
+  LoadContainer = 0x04,
+  MidiForward = 0x05,
+  SetLatency = 0x06
 };
 
 #pragma pack(push, 1)
+
+struct SetLatencyPacket {
+  uint8_t magic[4]{'T', 'K', 'B', 'P'};
+  uint8_t packetType{(uint8_t)PacketType::SetLatency};
+  uint32_t bufferSize{128}; // 32, 64, 128, 256
+};
+
+struct MidiForwardPacket {
+  uint8_t magic[4]{'T', 'K', 'B', 'P'};
+  uint8_t packetType{(uint8_t)PacketType::MidiForward};
+  uint8_t channel{1};
+  uint8_t statusByte{0}; // e.g. 0x90 (NoteOn), 0x80 (NoteOff), 0xB0 (CC)
+  uint8_t data1{0};      // Note Number or CC Controller Number
+  uint8_t data2{0};      // Velocity or CC Value
+};
+
 struct TelemetryPacket {
   uint8_t magic[4]{'T', 'K', 'B', 'P'}; // "TKBP"
   uint8_t packetType{(uint8_t)PacketType::TelemetryUpdate};

@@ -1,0 +1,46 @@
+# TutorKeybox Development TODO List
+
+---
+
+## 1. NetworkServer Architecture & UDP Optimization
+- [x] **Dual-Tier UDP Protocol Optimization**:
+  - **Tier 1 (Ultra-Low Latency - <5ms)**: Dedicated `MidiForwardPacket` stream for live MIDI event forwarding (Note On/Off, Pitch Bend, CC Messages). Bound directly to `AudioEngine::onMidiMessageReceived`.
+  - **Tier 2 (Relaxed Telemetry & State - 200ms interval)**: Throttled telemetry loop (5 Hz) for CPU usage, voice count, layer gains, and UI state feedback to eliminate socket churn.
+- [ ] **State Synchronization & Control**: Handle remote container loading and layer volume/mute commands asynchronously.
+
+---
+
+## 2. Memory Management & Hard Power-off Resilience
+- [x] **Crash/Power-Cut Safe Storage**: Zero-copy memory-mapped container streams (`SampleContainerReader`) read raw float arrays in read-only mode so abrupt power loss on the RasPi never causes corrupted `.bin` files.
+- [ ] **RAM Allocation & Safety**: Verify all audio buffers and attack buffers pre-allocate RAM on boot with zero dynamic heap allocation in the audio render callback.
+
+---
+
+## 3. Auto-Booting Sequence & GUI Startup Indicators
+- [ ] **RasPi System Daemon**: Create a `systemd` service configuration (`tutorkeybox.service`) for automatic headless boot on Pi power-up.
+- [ ] **Startup State Protocol**: Transmit explicit startup state flags over UDP (`Booting`, `Loading_Container`, `Ready`, `Error`).
+- [ ] **Mac GUI Banner Indicator**: Update `TelemetryHeaderView` to render dynamic visual state badges ("Keybox Starting Up...", "Keybox Ready", "Offline").
+
+---
+
+## 4. Hardware Audio Device Selection & ALSA Priority
+- [x] **Explicit ALSA Device Priority**: Priority scanning algorithm added to `AudioEngine::initialize()`. Successfully selected high-performance hardware output (`500R8` @ 48kHz, 128 samples).
+- [x] **Audio Initialization Error Handling**: Reports active hardware output state (`isAudioOK()`) and logs full sample rate / buffer size details on startup.
+
+---
+
+## 5. GUI Latency Configuration (32, 64, 128 Samples)
+- [x] **GUI Latency Selector**: Added dynamic ComboBox dropdown to `HardwareSelectorBar` (`32`, `64`, `128`, `256` samples).
+- [x] **Live Audio Re-configuration**: `AudioEngine::setBufferSize()` reconfigures hardware audio driver on the fly. `SetLatencyPacket` supported over UDP.
+
+---
+
+## 6. Per-Layer MIDI Input Routing
+- [ ] **Layer Card Dropdowns**: Add a MIDI device selection dropdown to each of the 4 Layer Cards in `LayerCardComponent`.
+- [ ] **Input Filtering Logic**: Allow assigning specific hardware USB-MIDI controllers (or "All Inputs") to target synth layers (Layer 0, 1, 2, 3).
+
+---
+
+## 7. Fixed Sample Format Implementation
+- [x] **Standardized Container Format**: Standardized audio format (32-bit float PCM arrays) for sample container `.bin` files.
+- [x] **Simplified Reader/Parser**: Zero RIFF WAV parsing overhead on runtime loading. Instant 480-sample load into `LayeredSynth`.

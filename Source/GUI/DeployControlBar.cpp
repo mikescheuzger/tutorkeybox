@@ -4,7 +4,8 @@ DeployControlBar::DeployControlBar(PresetManager &presetToDeploy)
     : presetManager(presetToDeploy) {
   deployButton.setColour(juce::TextButton::buttonColourId,
                          juce::Colour(0xff2e7d32)); // Dark green
-  deployButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+  deployButton.setColour(juce::TextButton::textColourOffId,
+                         juce::Colours::white);
   deployButton.onClick = [this] { triggerDeploy(); };
   addAndMakeVisible(deployButton);
 
@@ -26,16 +27,19 @@ void DeployControlBar::resized() {
 }
 
 void DeployControlBar::triggerDeploy() {
-  statusLabel.setText("Deploying to kbox.local...", juce::dontSendNotification);
+  statusLabel.setText("Deploying to KeyBox...", juce::dontSendNotification);
   statusLabel.setColour(juce::Label::textColourId, juce::Colours::orange);
 
+  // DeployClient tries kbox.local first, then automatically falls back to
+  // 127.0.0.1
   bool success = DeployClient::deployToHardware(presetManager, "kbox.local");
 
   if (success) {
-    statusLabel.setText("Successfully Deployed to KeyBox!", juce::dontSendNotification);
+    statusLabel.setText("Successfully Deployed!", juce::dontSendNotification);
     statusLabel.setColour(juce::Label::textColourId, juce::Colours::lightgreen);
   } else {
-    statusLabel.setText("Deploy Failed (Check kbox.local)", juce::dontSendNotification);
+    statusLabel.setText("Deploy Failed (Check Network / Daemon)",
+                        juce::dontSendNotification);
     statusLabel.setColour(juce::Label::textColourId, juce::Colours::red);
   }
 }

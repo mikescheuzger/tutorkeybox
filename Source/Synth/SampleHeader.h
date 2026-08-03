@@ -33,8 +33,12 @@ struct SampleEntry {
   uint8_t releaseVolume;
 
   uint64_t fileOffset;
-  uint64_t wavDataSize;
   uint32_t attackSampleSize;
+  uint32_t numChannels;     // e.g. 1 (mono) or 2 (stereo)
+  uint32_t sampleRate;      // e.g. 44100 or 48000 Hz
+  uint32_t totalNumSamples; // Total frame count in float array
+  uint64_t rawDataSize;     // Size in bytes: totalNumSamples * numChannels *
+                            // sizeof(float)
 };
 
 #pragma pack(pop)

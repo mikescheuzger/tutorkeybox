@@ -49,56 +49,54 @@ bool SampleContainerReader::loadContainerFile(const juce::File &binFile,
     indexTable.push_back(entry);
   }
 
-  // 4. Load the entire .bin file into memory ONCE (0 disk file descriptor exhaustion!)
+  // 4. Load the entire .bin file into memory ONCE (0 disk file descriptor
+  // exhaustion!)
   juce::MemoryBlock binData;
   if (!binFile.loadFileAsData(binData) || binData.getSize() == 0) {
-    juce::Logger::writeToLog("SampleContainerReader Error: Failed to load .bin data block.");
+    juce::Logger::writeToLog(
+        "SampleContainerReader Error: Failed to load .bin data block.");
     return false;
   }
 
-  juce::WavAudioFormat wavFormat;
-
   for (const auto &entry : indexTable) {
-    if (entry.fileOffset + entry.wavDataSize > binData.getSize())
+    if (entry.fileOffset + entry.rawDataSize > binData.getSize())
       continue;
 
-    // Create zero-copy memory stream pointing to this WAV sample block
-    auto memStream = std::make_unique<juce::MemoryInputStream>(
-        static_cast<const char *>(binData.getData()) + entry.fileOffset,
-        entry.wavDataSize, false);
+    // 5. Direct pointer to raw 32-bit Float PCM array in memory (Zero WAV
+    // format decoding!)
+    const float *rawFloatPtr = reinterpret_cast<const float *>(
+        static_cast<const char *>(binData.getData()) + entry.fileOffset);
 
-    std::unique_ptr<juce::AudioFormatReader> reader(
-        wavFormat.createReaderFor(memStream.release(), true));
+    int numChannels = (int)entry.numChannels;
+    int numSamples = (int)entry.totalNumSamples;
+    double sampleRate = (double)entry.sampleRate;
 
-    if (reader != nullptr) {
-      // 1. Read Full Sample Float Buffer (Clean 24-bit PCM decoding from memory!)
-      juce::AudioBuffer<float> tailBuffer((int)reader->numChannels,
-                                          (int)reader->lengthInSamples);
-      reader->read(&tailBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
-
-      // 2. Create Attack RAM Buffer (First 150ms slice)
-      int samplesToRead =
-          (entry.attackSampleSize > 0)
-              ? (int)entry.attackSampleSize
-              : juce::jmin((int)reader->lengthInSamples,
-                           juce::roundToInt(0.150 * reader->sampleRate));
-
-      juce::AudioBuffer<float> attackRamBuffer((int)reader->numChannels,
-                                               samplesToRead);
-      for (int ch = 0; ch < reader->numChannels; ++ch) {
-        attackRamBuffer.copyFrom(ch, 0, tailBuffer, ch, 0, samplesToRead);
-      }
-
-      int targetLayer = (targetLayerIndex >= 0 && targetLayerIndex <= 3)
-                            ? targetLayerIndex
-                            : entry.layerIndex;
-
-      // Create CustomSamplerSound object with both decoded float buffers
-      juce::SynthesiserSound::Ptr sound = new CustomSamplerSound(
-          entry, attackRamBuffer, tailBuffer, reader->sampleRate);
-
-      synthTarget.addSoundToLayer(targetLayer, sound);
+    // 6. Direct float copy into tailBuffer
+    juce::AudioBuffer<float> tailBuffer(numChannels, numSamples);
+    for (int ch = 0; ch < numChannels; ++ch) {
+      tailBuffer.copyFrom(ch, 0, rawFloatPtr + (ch * numSamples), numSamples);
     }
+
+    // 7. Create Attack RAM Buffer (First ~150ms slice)
+    int samplesToRead =
+        (entry.attackSampleSize > 0)
+            ? (int)entry.attackSampleSize
+            : juce::jmin(numSamples, juce::roundToInt(0.150 * sampleRate));
+
+    juce::AudioBuffer<float> attackRamBuffer(numChannels, samplesToRead);
+    for (int ch = 0; ch < numChannels; ++ch) {
+      attackRamBuffer.copyFrom(ch, 0, tailBuffer, ch, 0, samplesToRead);
+    }
+
+    int targetLayer = (targetLayerIndex >= 0 && targetLayerIndex <= 3)
+                          ? targetLayerIndex
+                          : entry.layerIndex;
+
+    // Create CustomSamplerSound object with pre-decoded float buffers
+    juce::SynthesiserSound::Ptr sound =
+        new CustomSamplerSound(entry, attackRamBuffer, tailBuffer, sampleRate);
+
+    synthTarget.addSoundToLayer(targetLayer, sound);
   }
 
   juce::Logger::writeToLog("SampleContainerReader Success: Loaded " +

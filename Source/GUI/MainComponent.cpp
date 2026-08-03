@@ -13,6 +13,13 @@ MainComponent::MainComponent() {
   // 1. Initialize audio hardware & MIDI inputs FIRST
   audioEngine.initialize();
 
+  juce::File testBin =
+      juce::File::getCurrentWorkingDirectory().getChildFile("TestPiano.bin");
+  if (testBin.existsAsFile()) {
+    SampleContainerReader::loadContainerFile(testBin, audioEngine.getSynth(),
+                                             0);
+  }
+
   // 2. Populate dropdown choices NOW that hardware is initialized!
   hardwareBar.updateDropdowns();
 

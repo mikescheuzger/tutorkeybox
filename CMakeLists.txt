@@ -115,11 +115,12 @@ target_compile_definitions(TKBPackager
 juce_add_console_app(TutorKeyboxCore
     PRODUCT_NAME "TutorKeyboxCore"
 )
-
 target_sources(TutorKeyboxCore
     PRIVATE
         Source/Core/HeadlessMain.cpp
         Source/Core/MidiState.h
+        Source/Core/PresetManager.h
+        Source/Core/PresetManager.cpp 
         Source/Audio/AudioEngine.h
         Source/Audio/AudioEngine.cpp
         Source/Synth/SampleHeader.h
@@ -130,13 +131,10 @@ target_sources(TutorKeyboxCore
         Source/Synth/LayeredSynth.cpp
         Source/Synth/SampleContainerReader.h
         Source/Synth/SampleContainerReader.cpp
-        Source/Synth/SamplePackager.h
-        Source/Synth/SamplePackager.cpp
         Source/Network/NetworkProtocol.h
         Source/Network/NetworkServer.h
         Source/Network/NetworkServer.cpp
 )
-
 target_link_libraries(TutorKeyboxCore
     PRIVATE
         juce::juce_audio_basics
@@ -147,8 +145,6 @@ target_link_libraries(TutorKeyboxCore
         juce::juce_core
         juce::juce_data_structures
         juce::juce_events
-        juce::juce_graphics
-        juce::juce_gui_basics
         juce::juce_recommended_config_flags
 )
 

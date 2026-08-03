@@ -103,61 +103,60 @@ bool SamplePackager::createPackage(const juce::File &inputWavDir,
   } else if (inputWavDir.getFileExtension().equalsIgnoreCase(".wav")) {
     wavFiles.add(inputWavDir);
   }
-
   if (wavFiles.isEmpty())
     return false;
-
   juce::WavAudioFormat wavFormat;
   std::vector<SampleEntry> entries;
-  std::vector<juce::MemoryBlock> wavDataBlocks;
-
+  std::vector<juce::MemoryBlock> floatDataBlocks;
   uint64_t currentOffset =
       sizeof(ContainerHeader) + (wavFiles.size() * sizeof(SampleEntry));
-
   for (int i = 0; i < wavFiles.size(); ++i) {
     const auto &wavFile = wavFiles[i];
     std::unique_ptr<juce::AudioFormatReader> reader(
         wavFormat.createReaderFor(wavFile.createInputStream().release(), true));
     if (reader == nullptr)
       continue;
-
-    juce::MemoryBlock block;
-    wavFile.loadFileAsData(block);
-
+    // 1. Read entire WAV file into normalized 32-bit float AudioBuffer
+    int numSamples = (int)reader->lengthInSamples;
+    int numChannels = (int)reader->numChannels;
+    juce::AudioBuffer<float> fullSampleBuffer(numChannels, numSamples);
+    reader->read(&fullSampleBuffer, 0, numSamples, 0, true, true);
+    // 2. Find zero crossing for 150ms attack buffer
     int target150ms = juce::roundToInt(0.150 * reader->sampleRate);
-    juce::AudioBuffer<float> tempBuffer(
-        (int)reader->numChannels,
-        juce::jmin((int)reader->lengthInSamples, target150ms + 1050));
-    reader->read(&tempBuffer, 0, tempBuffer.getNumSamples(), 0, true, true);
-
-    int zeroCrossingIndex = findZeroCrossing(tempBuffer, target150ms);
-
+    int zeroCrossingIndex = findZeroCrossing(fullSampleBuffer, target150ms);
+    // 3. Convert float AudioBuffer into raw memory block (channel data
+    // sequential)
+    juce::MemoryBlock floatBlock;
+    size_t rawBytes = (size_t)(numChannels * numSamples * sizeof(float));
+    floatBlock.setSize(rawBytes, false);
+    float *destPtr = reinterpret_cast<float *>(floatBlock.getData());
+    for (int ch = 0; ch < numChannels; ++ch) {
+      std::memcpy(destPtr + (ch * numSamples),
+                  fullSampleBuffer.getReadPointer(ch),
+                  numSamples * sizeof(float));
+    }
+    // 4. Populate updated SampleEntry metadata
     SampleEntry entry{};
     entry.sampleID = (uint32_t)(i + 1);
-
     juce::String nameStr = wavFile.getFileNameWithoutExtension();
     nameStr.copyToUTF8(entry.name, sizeof(entry.name) - 1);
-
     entry.layerIndex = 0;
     entry.rootNote = (uint8_t)parseMidiNoteFromName(nameStr);
-
     // Parse Velocity Layer (e.g. v1 = 0-7, v16 = 120-127)
     parseVelocityRange(nameStr, entry.velLow, entry.velHigh);
-
     entry.isReleaseSample =
         nameStr.containsIgnoreCase("rel") ? (uint8_t)1 : (uint8_t)0;
     entry.releaseVolume = 127;
-
     entry.fileOffset = currentOffset;
-    entry.wavDataSize = block.getSize();
     entry.attackSampleSize = (uint32_t)zeroCrossingIndex;
-
+    entry.numChannels = (uint32_t)numChannels;
+    entry.sampleRate = (uint32_t)reader->sampleRate;
+    entry.totalNumSamples = (uint32_t)numSamples;
+    entry.rawDataSize = (uint64_t)rawBytes;
     entries.push_back(entry);
-    wavDataBlocks.push_back(block);
-
-    currentOffset += block.getSize();
+    floatDataBlocks.push_back(floatBlock);
+    currentOffset += rawBytes;
   }
-
   // 1. Extract unique pitch root notes for non-release samples
   std::vector<uint8_t> uniqueRoots;
   for (const auto &entry : entries) {
@@ -168,7 +167,6 @@ bool SamplePackager::createPackage(const juce::File &inputWavDir,
     }
   }
   std::sort(uniqueRoots.begin(), uniqueRoots.end());
-
   // 2. Calculate Key Zones based on adjacent pitch roots
   for (auto &entry : entries) {
     if (entry.isReleaseSample != 0) {
@@ -176,23 +174,18 @@ bool SamplePackager::createPackage(const juce::File &inputWavDir,
       entry.keyHigh = entry.rootNote;
       continue;
     }
-
     auto it = std::find(uniqueRoots.begin(), uniqueRoots.end(), entry.rootNote);
     if (it != uniqueRoots.end()) {
       size_t idx = std::distance(uniqueRoots.begin(), it);
       uint8_t prevRoot = (idx == 0) ? 0 : uniqueRoots[idx - 1];
-      // Pitch DOWN ONLY: Highest key is rootNote itself, keyLow extends
-      // downwards!
       entry.keyLow = (idx == 0) ? 0 : (uint8_t)(prevRoot + 1);
       entry.keyHigh = entry.rootNote;
     }
   }
-
   outputBinFile.deleteFile();
   juce::FileOutputStream outStream(outputBinFile);
   if (!outStream.openedOk())
     return false;
-
   ContainerHeader containerHeader{};
   containerHeader.magic[0] = TKB_Magic[0];
   containerHeader.magic[1] = TKB_Magic[1];
@@ -200,11 +193,10 @@ bool SamplePackager::createPackage(const juce::File &inputWavDir,
   containerHeader.magic[3] = TKB_Magic[3];
   containerHeader.version = 1;
   containerHeader.numSampleEntries = (uint32_t)entries.size();
-
   outStream.write(&containerHeader, sizeof(ContainerHeader));
   for (const auto &entry : entries)
     outStream.write(&entry, sizeof(SampleEntry));
-  for (const auto &block : wavDataBlocks)
+  for (const auto &block : floatDataBlocks)
     outStream.write(block.getData(), block.getSize());
   return true;
 }

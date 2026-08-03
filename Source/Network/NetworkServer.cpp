@@ -34,9 +34,10 @@ void NetworkServer::run() {
     juce::String senderIP;
     int senderPort = 0;
 
-    int bytesRead = socket.waitUntilReady(true, 50) > 0
-                        ? socket.read(buffer, sizeof(buffer), false, senderIP, senderPort)
-                        : 0;
+    int bytesRead =
+        socket.waitUntilReady(true, 50) > 0
+            ? socket.read(buffer, sizeof(buffer), false, senderIP, senderPort)
+            : 0;
 
     if (bytesRead > 0) {
       clientAddress = juce::IPAddress(senderIP);
@@ -53,14 +54,37 @@ void NetworkServer::run() {
                                                   packet->gain);
             audioEngine.getSynth().setLayerMute(packet->layerIndex,
                                                 packet->isMuted != 0);
+          } else if (packet->packetType ==
+                         (uint8_t)NetworkProtocol::PacketType::SetLatency &&
+                     bytesRead >= sizeof(NetworkProtocol::SetLatencyPacket)) {
+            auto *latPacket =
+                reinterpret_cast<NetworkProtocol::SetLatencyPacket *>(buffer);
+            audioEngine.setBufferSize((int)latPacket->bufferSize);
           }
         }
       }
     }
-
-    // Broadcast 30 Hz Telemetry to client
-    sendTelemetry();
+    // Capped 5 Hz (200ms) Telemetry Stream
+    uint32_t now = juce::Time::getMillisecondCounter();
+    if (now - lastTelemetryTime >= 200) {
+      sendTelemetry();
+      lastTelemetryTime = now;
+    }
   }
+}
+
+void NetworkServer::broadcastMidiMessage(const juce::MidiMessage &message) {
+  if (clientAddress.toString().isEmpty() || clientPort == 0)
+    return;
+  NetworkProtocol::MidiForwardPacket packet{};
+  packet.channel = (uint8_t)message.getChannel();
+  packet.statusByte = (uint8_t)message.getRawData()[0];
+  packet.data1 =
+      message.getRawDataSize() > 1 ? (uint8_t)message.getRawData()[1] : 0;
+  packet.data2 =
+      message.getRawDataSize() > 2 ? (uint8_t)message.getRawData()[2] : 0;
+  socket.write(clientAddress.toString(), clientPort, &packet,
+               sizeof(NetworkProtocol::MidiForwardPacket));
 }
 
 void NetworkServer::sendTelemetry() {

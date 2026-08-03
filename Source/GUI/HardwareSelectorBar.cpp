@@ -4,9 +4,16 @@ HardwareSelectorBar::HardwareSelectorBar(AudioEngine &engineToControl)
     : audioEngine(engineToControl) {
   audioOutputSelector.setTextWhenNothingSelected("Select Audio Output");
   midiInputSelector.setTextWhenNothingSelected("Select MIDI Input");
+  latencySelector.setTextWhenNothingSelected("Select Latency");
+
+  latencySelector.addItem("32 samples (~0.7 ms)", 1);
+  latencySelector.addItem("64 samples (~1.3 ms)", 2);
+  latencySelector.addItem("128 samples (~2.7 ms)", 3);
+  latencySelector.addItem("256 samples (~5.3 ms)", 4);
 
   addAndMakeVisible(audioOutputSelector);
   addAndMakeVisible(midiInputSelector);
+  addAndMakeVisible(latencySelector);
 
   updateDropdowns();
 
@@ -42,7 +49,23 @@ HardwareSelectorBar::HardwareSelectorBar(AudioEngine &engineToControl)
       }
     }
   };
-} // <--- Constructor ends here!
+
+  // Latency Change Handler
+  latencySelector.onChange = [this]() {
+    int id = latencySelector.getSelectedId();
+    int bufferSize = 128;
+    if (id == 1)
+      bufferSize = 32;
+    else if (id == 2)
+      bufferSize = 64;
+    else if (id == 3)
+      bufferSize = 128;
+    else if (id == 4)
+      bufferSize = 256;
+
+    audioEngine.setBufferSize(bufferSize);
+  };
+}
 
 void HardwareSelectorBar::updateDropdowns() {
   // 1. Scan Audio Output Devices
@@ -89,11 +112,27 @@ void HardwareSelectorBar::updateDropdowns() {
     audioEngine.getDeviceManager().addMidiInputDeviceCallback(
         midiInputs[0].identifier, &audioEngine);
   }
+
+  // 3. Select active buffer size in latency dropdown
+  if (currentSetup.bufferSize == 32)
+    latencySelector.setSelectedId(1, juce::dontSendNotification);
+  else if (currentSetup.bufferSize == 64)
+    latencySelector.setSelectedId(2, juce::dontSendNotification);
+  else if (currentSetup.bufferSize == 128)
+    latencySelector.setSelectedId(3, juce::dontSendNotification);
+  else if (currentSetup.bufferSize == 256)
+    latencySelector.setSelectedId(4, juce::dontSendNotification);
+  else
+    latencySelector.setSelectedId(3, juce::dontSendNotification);
 }
 
 void HardwareSelectorBar::resized() {
   auto area = getLocalBounds();
-  audioOutputSelector.setBounds(area.removeFromTop(32));
-  area.removeFromTop(8);
-  midiInputSelector.setBounds(area.removeFromTop(32));
+  int itemWidth = (area.getWidth() - 16) / 3;
+
+  audioOutputSelector.setBounds(area.removeFromLeft(itemWidth));
+  area.removeFromLeft(8);
+  midiInputSelector.setBounds(area.removeFromLeft(itemWidth));
+  area.removeFromLeft(8);
+  latencySelector.setBounds(area);
 }

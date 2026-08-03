@@ -1,29 +1,93 @@
 #include "AudioEngine.h"
+
 AudioEngine::AudioEngine(MidiState &stateToUpdate)
     : midiState(stateToUpdate), synth(stateToUpdate) {}
+
 AudioEngine::~AudioEngine() { shutdown(); }
 
-void AudioEngine::initialize() {
-  // 1. Initialize hardware soundcard
-  deviceManager.initialiseWithDefaultDevices(0, 2);
-  // 2. Set low latency buffer size (prefer 128/256 samples for ALSA compatibility)
+bool AudioEngine::initialize() {
+  audioDeviceOK = false;
+  // 1. Prefer ALSA device type on Linux/RasPi, CoreAudio on macOS
+  juce::String preferredDeviceType = "ALSA";
+  const auto &availableTypes = deviceManager.getAvailableDeviceTypes();
+
+  for (auto *type : availableTypes) {
+    if (type->getTypeName().equalsIgnoreCase(preferredDeviceType)) {
+      deviceManager.setCurrentAudioDeviceType(preferredDeviceType, true);
+      break;
+    }
+  }
+  // 2. Scan available output devices and select highest priority hardware
+  auto *currentType = deviceManager.getCurrentDeviceTypeObject();
+  juce::String bestOutputDevice = "";
+  if (currentType != nullptr) {
+    auto outputDevices = currentType->getDeviceNames(false); // output devices
+    int highestScore = -1;
+    for (const auto &devName : outputDevices) {
+      int score = 1; // Default medium priority
+      if (devName.containsIgnoreCase("USB") ||
+          devName.containsIgnoreCase("DAC") ||
+          devName.containsIgnoreCase("HiFiBerry") ||
+          devName.containsIgnoreCase("Focusrite") ||
+          devName.containsIgnoreCase("500R8")) {
+        score = 3; // Top priority: USB / Hardware DAC
+      } else if (devName.startsWithIgnoreCase("hw:") ||
+                 devName.startsWithIgnoreCase("plughw:")) {
+        score = 2; // Direct ALSA hardware
+      } else if (devName.containsIgnoreCase("hdmi") ||
+                 devName.containsIgnoreCase("bcm2835")) {
+        score = 0; // Avoid HDMI output
+      }
+      if (score > highestScore) {
+        highestScore = score;
+        bestOutputDevice = devName;
+      }
+    }
+  }
+  // 3. Configure Audio Device Setup
   juce::AudioDeviceManager::AudioDeviceSetup setup;
   deviceManager.getAudioDeviceSetup(setup);
-  if (setup.bufferSize == 0 || setup.bufferSize > 512) {
-    setup.bufferSize = 256;
-  } else {
-    setup.bufferSize = 128;
+  setup.outputChannels = 2; // Stereo output
+  setup.inputChannels = 0;
+  if (bestOutputDevice.isNotEmpty()) {
+    setup.outputDeviceName = bestOutputDevice;
   }
-  deviceManager.setAudioDeviceSetup(setup, true);
-  // 3. Register audio callback
+  // Set low latency buffer size (prefer 128 samples)
+  setup.bufferSize = 128;
+  juce::String error = deviceManager.setAudioDeviceSetup(setup, true);
+  if (error.isNotEmpty()) {
+    juce::Logger::writeToLog(
+        "AudioEngine Error: Failed to open audio device - " + error);
+    // Fall back to default devices if priority selection failed
+    deviceManager.initialiseWithDefaultDevices(0, 2);
+  }
+  auto *currentDevice = deviceManager.getCurrentAudioDevice();
+  if (currentDevice != nullptr && currentDevice->isPlaying()) {
+    audioDeviceOK = true;
+    juce::Logger::writeToLog(
+        "AudioEngine Success: Active Audio Output -> " +
+        currentDevice->getName() + " [" +
+        juce::String(currentDevice->getCurrentSampleRate()) + " Hz, " +
+        juce::String(currentDevice->getCurrentBufferSizeSamples()) +
+        " samples]");
+  } else {
+    juce::Logger::writeToLog(
+        "AudioEngine Warning: No active audio output device opened!");
+  }
+  // 4. Register audio callback
   deviceManager.addAudioCallback(this);
-  // 4. Automatically enable and listen to EVERY connected MIDI input device!
+  // 5. Enable all connected hardware MIDI controllers
   auto midiInputs = juce::MidiInput::getAvailableDevices();
   for (const auto &input : midiInputs) {
     deviceManager.setMidiInputDeviceEnabled(input.identifier, true);
     deviceManager.addMidiInputDeviceCallback(input.identifier, this);
     juce::Logger::writeToLog("Connected MIDI Input Device: " + input.name);
   }
+  return audioDeviceOK;
+}
+juce::String AudioEngine::getActiveAudioDeviceName() const {
+  auto *device = deviceManager.getCurrentAudioDevice();
+  return device != nullptr ? device->getName() : "None";
 }
 
 void AudioEngine::shutdown() {
@@ -33,15 +97,31 @@ void AudioEngine::shutdown() {
     deviceManager.removeMidiInputDeviceCallback(input.identifier, this);
   }
 
-  // Stop audio processing callback
   deviceManager.removeAudioCallback(this);
 }
+
+bool AudioEngine::setBufferSize(int newBufferSize) {
+  if (newBufferSize <= 0)
+    return false;
+  juce::AudioDeviceManager::AudioDeviceSetup setup;
+  deviceManager.getAudioDeviceSetup(setup);
+  setup.bufferSize = newBufferSize;
+  juce::String error = deviceManager.setAudioDeviceSetup(setup, true);
+  if (error.isEmpty()) {
+    juce::Logger::writeToLog("AudioEngine Success: Buffer size updated -> " +
+                             juce::String(newBufferSize) + " samples");
+    return true;
+  }
+  juce::Logger::writeToLog("AudioEngine Error: Failed to set buffer size " +
+                           juce::String(newBufferSize) + " - " + error);
+  return false;
+}
+
+// Stop audio processing callback
 
 void AudioEngine::handleIncomingMidiMessage(juce::MidiInput * /*source*/,
                                             const juce::MidiMessage &message) {
   if (message.isNoteOn()) {
-    juce::Logger::writeToLog("MIDI NOTE ON: " +
-                             juce::String(message.getNoteNumber()));
     midiState.noteOn(message.getNoteNumber(), message.getFloatVelocity());
   } else if (message.isNoteOff()) {
     midiState.noteOff(message.getNoteNumber());
@@ -49,13 +129,18 @@ void AudioEngine::handleIncomingMidiMessage(juce::MidiInput * /*source*/,
     bool pedalDown = (message.getControllerValue() >= 64);
     midiState.setSustainPedal(pedalDown);
   }
+
+  // Forward live hardware MIDI message to NetworkServer (if bound)
+  if (onMidiMessageReceived != nullptr) {
+    onMidiMessageReceived(message);
+  }
+
   // Queue MIDI message safely for real-time sound engine
   const juce::ScopedLock sl(midiLock);
   incomingMidiBuffer.addEvent(message, 0);
 }
 
 void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice *device) {
-  // Will be used later when we prepare our sound sample engine
   if (device != nullptr) {
     synth.prepareToPlay(device->getCurrentSampleRate(),
                         device->getCurrentBufferSizeSamples());
@@ -74,6 +159,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
   juce::AudioBuffer<float> buffer(outputChannelData, numOutputChannels,
                                   numSamples);
   buffer.clear();
+
   // 2. Safely extract queued real-time MIDI messages
   juce::MidiBuffer midiMessagesToProcess;
   {
@@ -81,6 +167,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext(
     midiMessagesToProcess.addEvents(incomingMidiBuffer, 0, numSamples, 0);
     incomingMidiBuffer.clear();
   }
+
   // 3. Render 4-layer polyphonic synth audio directly to speakers!
   synth.renderNextBlock(buffer, midiMessagesToProcess, 0, numSamples);
 }

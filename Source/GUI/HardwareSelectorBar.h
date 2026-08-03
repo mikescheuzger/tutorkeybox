@@ -19,6 +19,7 @@ private:
 
   juce::ComboBox audioOutputSelector;
   juce::ComboBox midiInputSelector;
+  juce::ComboBox latencySelector;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HardwareSelectorBar);
 };

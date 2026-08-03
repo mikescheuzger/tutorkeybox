@@ -6,10 +6,14 @@ AudioEngine::~AudioEngine() { shutdown(); }
 void AudioEngine::initialize() {
   // 1. Initialize hardware soundcard
   deviceManager.initialiseWithDefaultDevices(0, 2);
-  // 2. Set low latency buffer size (128 samples = ~3ms)
+  // 2. Set low latency buffer size (prefer 128/256 samples for ALSA compatibility)
   juce::AudioDeviceManager::AudioDeviceSetup setup;
   deviceManager.getAudioDeviceSetup(setup);
-  setup.bufferSize = 128;
+  if (setup.bufferSize == 0 || setup.bufferSize > 512) {
+    setup.bufferSize = 256;
+  } else {
+    setup.bufferSize = 128;
+  }
   deviceManager.setAudioDeviceSetup(setup, true);
   // 3. Register audio callback
   deviceManager.addAudioCallback(this);

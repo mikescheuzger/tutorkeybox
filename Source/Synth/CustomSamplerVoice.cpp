@@ -10,21 +10,23 @@ bool CustomSamplerVoice::canPlaySound(juce::SynthesiserSound *sound) {
 void CustomSamplerVoice::startNote(int midiNoteNumber, float velocity,
                                    juce::SynthesiserSound *sound,
                                    int /*currentPitchWheelPosition*/) {
-  if (auto *samplerSound = dynamic_cast<const CustomSamplerSound *>(sound)) {
+  activeSound = static_cast<const CustomSamplerSound *>(sound);
+  if (activeSound != nullptr) {
     int velInt = juce::roundToInt(velocity * 127.0f);
-    if (!samplerSound->appliesToVelocity(velInt)) {
+    if (!activeSound->appliesToVelocity(velInt)) {
       clearCurrentNote();
+      activeSound = nullptr;
       return;
     }
 
     double noteHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
-    double rootHz = juce::MidiMessage::getMidiNoteInHertz(
-        samplerSound->getEntry().rootNote);
+    double rootHz =
+        juce::MidiMessage::getMidiNoteInHertz(activeSound->getEntry().rootNote);
     double outputSampleRate = getSampleRate();
 
     if (outputSampleRate > 0.0) {
       pitchRatio = (noteHz / rootHz) *
-                   (samplerSound->getSourceSampleRate() / outputSampleRate);
+                   (activeSound->getSourceSampleRate() / outputSampleRate);
     } else {
       pitchRatio = 1.0;
     }
@@ -36,14 +38,14 @@ void CustomSamplerVoice::startNote(int midiNoteNumber, float velocity,
     releaseFactor = 1.0f;
     attackRamp = 0.0f;
 
-    const auto &entry = samplerSound->getEntry();
+    const auto &entry = activeSound->getEntry();
     if (midiState != nullptr) {
       midiState->updateSampleInspector(entry.name, entry.rootNote, entry.keyLow,
                                        entry.keyHigh, entry.velLow,
                                        entry.velHigh);
     }
   } else {
-    jassertfalse;
+    clearCurrentNote();
   }
 }
 
@@ -53,7 +55,7 @@ void CustomSamplerVoice::stopNote(float /*velocity*/, bool allowTailOff) {
   } else {
     clearCurrentNote();
     sourceSamplePosition = 0.0;
-    tailReader.reset();
+    activeSound = nullptr;
   }
 }
 
@@ -63,16 +65,10 @@ void CustomSamplerVoice::controllerMoved(int /*controllerNumber*/,
 
 void CustomSamplerVoice::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
                                          int startSample, int numSamples) {
-  auto *currentSound = dynamic_cast<const CustomSamplerSound *>(
-      getCurrentlyPlayingSound().get());
-  if (currentSound == nullptr)
+  if (activeSound == nullptr)
     return;
 
-  const auto &attackBuffer = currentSound->getAttackBuffer();
-  const int attackNumSamples = attackBuffer.getNumSamples();
-  const float *const *inChannels = attackBuffer.getArrayOfReadPointers();
-
-  const auto &tailBuffer = currentSound->getTailBuffer();
+  const auto &tailBuffer = activeSound->getTailBuffer();
   const int tailNumSamples = tailBuffer.getNumSamples();
   const float *const *tailChannels = tailBuffer.getArrayOfReadPointers();
 
@@ -97,6 +93,7 @@ void CustomSamplerVoice::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
               : sampleL;
     } else {
       clearCurrentNote();
+      activeSound = nullptr;
       break;
     }
 
@@ -108,6 +105,7 @@ void CustomSamplerVoice::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
       releaseFactor *= 0.9992f;
       if (releaseFactor < 0.001f) {
         clearCurrentNote();
+        activeSound = nullptr;
         break;
       }
     }

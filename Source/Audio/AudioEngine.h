@@ -6,9 +6,7 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 
 class AudioEngine : public juce::AudioIODeviceCallback,
-                    public juce::MidiInputCallback
-
-{
+                    public juce::MidiInputCallback {
 public:
   explicit AudioEngine(MidiState &stateToUpdate);
   ~AudioEngine() override;
@@ -16,6 +14,7 @@ public:
   bool initialize();
   void shutdown();
   bool setBufferSize(int newBufferSize);
+  void refreshMidiInputs(); // <--- Live MIDI Hotplug Scanner!
 
   bool isAudioOK() const { return audioDeviceOK; }
   juce::String getActiveAudioDeviceName() const;

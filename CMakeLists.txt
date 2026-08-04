@@ -135,6 +135,10 @@ target_sources(TutorKeyboxCore
         Source/Network/NetworkServer.h
         Source/Network/NetworkServer.cpp
 )
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+    target_compile_options(TutorKeyboxCore PRIVATE -O3 -mcpu=cortex-a76)
+endif()
+
 target_link_libraries(TutorKeyboxCore
     PRIVATE
         juce::juce_audio_basics

@@ -9,9 +9,12 @@ LayeredSynth::LayeredSynth(MidiState &stateToUpdate)
   }
 }
 
-void LayeredSynth::prepareToPlay(double sampleRate, int /*samplesPerBlock*/) {
+void LayeredSynth::prepareToPlay(double sampleRate, int samplesPerBlock) {
+  int safeBlockSize = juce::jmax(512, samplesPerBlock);
   for (int layerIdx = 0; layerIdx < NUM_LAYERS; ++layerIdx) {
     layers[layerIdx].synth.setCurrentPlaybackSampleRate(sampleRate);
+    // Optimization A: Pre-allocate tempBuffer capacity ONCE
+    layers[layerIdx].tempBuffer.setSize(2, safeBlockSize, false, false, true);
   }
 }
 
@@ -28,24 +31,15 @@ void LayeredSynth::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
     for (const auto metadata : midiMessages) {
       auto msg = metadata.getMessage();
       if (msg.isNoteOn()) {
-        int note = msg.getNoteNumber();
-        int velInt = juce::roundToInt(msg.getFloatVelocity() * 127.0f);
+        int note = juce::jlimit(0, 127, msg.getNoteNumber());
+        int velInt = juce::jlimit(
+            0, 127, juce::roundToInt(msg.getFloatVelocity() * 127.0f));
 
-        // Find the SINGLE matching sound for pitch AND velocity!
-        juce::SynthesiserSound::Ptr matchingSound = nullptr;
-        for (int s = 0; s < layer.synth.getNumSounds(); ++s) {
-          auto snd = layer.synth.getSound(s);
-          if (auto *cs = const_cast<CustomSamplerSound *>(
-                  dynamic_cast<const CustomSamplerSound *>(snd.get()))) {
-            if (cs->appliesToNote(note) && cs->appliesToVelocity(velInt)) {
-              matchingSound = snd;
-              break;
-            }
-          }
-        }
+        // Optimization B: O(1) Instant Direct Sound Lookup Grid Access!
+        juce::SynthesiserSound::Ptr matchingSound =
+            layer.soundLookupGrid[note][velInt];
 
         if (matchingSound != nullptr) {
-          // Find a free or oldest voice on this layer synth
           juce::SynthesiserVoice *voiceToUse = nullptr;
           for (int v = 0; v < layer.synth.getNumVoices(); ++v) {
             auto *vPtr = layer.synth.getVoice(v);
@@ -55,12 +49,13 @@ void LayeredSynth::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
             }
           }
           if (voiceToUse == nullptr && layer.synth.getNumVoices() > 0) {
-            voiceToUse = layer.synth.getVoice(0); // Reuse voice 0 if all busy
+            voiceToUse = layer.synth.getVoice(0); // Voice stealing
           }
 
           if (voiceToUse != nullptr) {
             layer.synth.triggerVoice(voiceToUse, matchingSound.get(),
-                                     msg.getChannel(), note, msg.getFloatVelocity());
+                                     msg.getChannel(), note,
+                                     msg.getFloatVelocity());
           }
         }
       } else {
@@ -68,15 +63,13 @@ void LayeredSynth::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
       }
     }
 
-    juce::AudioBuffer<float> tempBuffer(outputBuffer.getNumChannels(),
-                                        numSamples);
-    tempBuffer.clear();
-
-    // Render audio and non-NoteOn messages (Note Off, Sustain Pedal, etc.)
-    layer.synth.renderNextBlock(tempBuffer, nonNoteOnMessages, 0, numSamples);
+    // Optimization A: Reuse pre-allocated tempBuffer without heap malloc
+    layer.tempBuffer.clear(0, numSamples);
+    layer.synth.renderNextBlock(layer.tempBuffer, nonNoteOnMessages, 0,
+                                numSamples);
 
     for (int ch = 0; ch < outputBuffer.getNumChannels(); ++ch) {
-      outputBuffer.addFrom(ch, startSample, tempBuffer, ch, 0, numSamples,
+      outputBuffer.addFrom(ch, startSample, layer.tempBuffer, ch, 0, numSamples,
                            layer.volumeGain);
     }
   }
@@ -85,19 +78,41 @@ void LayeredSynth::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
 void LayeredSynth::addSoundToLayer(int layerIndex,
                                    juce::SynthesiserSound::Ptr sound) {
   if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
-    layers[layerIndex].synth.addSound(sound);
+    auto &layer = layers[layerIndex];
+    layer.synth.addSound(sound);
+
+    // Optimization B: Populate O(1) Sound Lookup Grid for fast note triggering
+    if (auto *cs = dynamic_cast<CustomSamplerSound *>(sound.get())) {
+      const auto &entry = cs->getEntry();
+      int kLow = juce::jlimit(0, 127, (int)entry.keyLow);
+      int kHigh = juce::jlimit(0, 127, (int)entry.keyHigh);
+      int vLow = juce::jlimit(0, 127, (int)entry.velLow);
+      int vHigh = juce::jlimit(0, 127, (int)entry.velHigh);
+
+      for (int n = kLow; n <= kHigh; ++n) {
+        for (int v = vLow; v <= vHigh; ++v) {
+          layer.soundLookupGrid[n][v] = sound;
+        }
+      }
+    }
   }
 }
 
 void LayeredSynth::clearLayer(int layerIndex) {
   if (layerIndex >= 0 && layerIndex < NUM_LAYERS) {
-    layers[layerIndex].synth.clearSounds();
+    auto &layer = layers[layerIndex];
+    layer.synth.clearSounds();
+    for (int n = 0; n < 128; ++n) {
+      for (int v = 0; v < 128; ++v) {
+        layer.soundLookupGrid[n][v] = nullptr;
+      }
+    }
   }
 }
 
 void LayeredSynth::clearAllLayers() {
   for (int layerIdx = 0; layerIdx < NUM_LAYERS; ++layerIdx) {
-    layers[layerIdx].synth.clearSounds();
+    clearLayer(layerIdx);
   }
 }
 

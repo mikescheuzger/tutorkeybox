@@ -6,8 +6,9 @@
 
 class LayerSynthesiser : public juce::Synthesiser {
 public:
-  void triggerVoice(juce::SynthesiserVoice *voice, juce::SynthesiserSound *sound,
-                    int midiChannel, int midiNoteNumber, float velocity) {
+  void triggerVoice(juce::SynthesiserVoice *voice,
+                    juce::SynthesiserSound *sound, int midiChannel,
+                    int midiNoteNumber, float velocity) {
     startVoice(voice, sound, midiChannel, midiNoteNumber, velocity);
   }
 };
@@ -41,6 +42,13 @@ private:
     LayerSynthesiser synth;
     float volumeGain{1.0f};
     bool muted{false};
+
+    // Optimization A: Pre-allocated render buffer (Zero Heap Allocation)
+    juce::AudioBuffer<float> tempBuffer;
+
+    // Optimization B: O(1) Constant-Time Sound Lookup Matrix [Note][Velocity]
+    std::array<std::array<juce::SynthesiserSound::Ptr, 128>, 128>
+        soundLookupGrid;
   };
 
   std::array<Layer, NUM_LAYERS> layers;

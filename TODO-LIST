@@ -1,46 +1,68 @@
 # TutorKeybox Development TODO List
 
+==============================================================================
+## TIER 1: CORE FOUNDATION & HARDWARE PERFORMANCE (Fundamental Engine)
+==============================================================================
+
+### Section 1: High-Performance Audio Engine Optimizations
+- [x] **Optimization A (Zero Heap Allocations)**: Pre-allocated `tempBuffer` rendering storage in `LayeredSynth`. `renderNextBlock` is 100% allocation-free on the real-time audio thread.
+- [x] **Optimization B ($O(1)$ Sound Lookup Table)**: Replaced linear array scanning in `LayeredSynth::renderNextBlock` with a 2D sound lookup matrix (`soundLookupGrid[128][128]`) for instant constant-time 1-clock-cycle sound selection per note & velocity.
+- [x] **Optimization C (ARM NEON SIMD Vectorization)**: Added Cortex-A76 NEON vectorization compile flags (`-O3 -mcpu=cortex-a76`) in `CMakeLists.txt` for SIMD-accelerated sample interpolation on Raspberry Pi 5.
+
+### Section 2: Memory Management & Hard Power-Off Resilience
+- [x] **Crash/Power-Cut Safe Storage**: Zero-copy memory-mapped container streams (`SampleContainerReader`) read raw float arrays in read-only mode so abrupt power loss on the RasPi never causes corrupted `.bin` files.
+- [x] **RAM Allocation & Safety**: Cached direct sound pointers in `CustomSamplerVoice` to eliminate runtime RTTI `dynamic_cast` from audio render callbacks. Voice memory buffers and sample lookup grids pre-allocated on boot.
+
 ---
 
-## 1. NetworkServer Architecture & UDP Optimization
+==============================================================================
+## TIER 2: SYNTH CAPABILITIES & DSP MODELING (Core Functionality)
+==============================================================================
+
+### Section 3: Advanced Sound Modeling & Expression DSP
+- [ ] **Dynamic Low-Pass Filter & ADSR Envelope**: Add per-layer resonant filter (`juce::dsp::StateVariableFilter`) and ADSR envelope generator for dynamic cutoff sweeps, attack shaping, and release damping.
+- [ ] **Per-Layer Velocity Response Curves**: Implement velocity curve transformations (Linear, Exponential, Logarithmic, S-Curve) to customize touch response per keybed.
+- [ ] **Stretch Tuning & Pitch Offset Calibration**: Support master pitch offset (A4 = 440 Hz, 432 Hz, or acoustic piano octave stretch tuning).
+
+---
+
+==============================================================================
+## TIER 3: NETWORK & REMOTE INFRASTRUCTURE (Connectivity)
+==============================================================================
+
+### Section 4: NetworkServer Architecture & UDP Protocol
 - [x] **Dual-Tier UDP Protocol Optimization**:
-  - **Tier 1 (Ultra-Low Latency - <5ms)**: Dedicated `MidiForwardPacket` stream for live MIDI event forwarding (Note On/Off, Pitch Bend, CC Messages). Bound directly to `AudioEngine::onMidiMessageReceived`.
-  - **Tier 2 (Relaxed Telemetry & State - 200ms interval)**: Throttled telemetry loop (5 Hz) for CPU usage, voice count, layer gains, and UI state feedback to eliminate socket churn.
+  - **Tier 1 (Ultra-Low Latency - <5ms)**: Dedicated `MidiForwardPacket` stream for live MIDI event forwarding. Bound directly to `AudioEngine::onMidiMessageReceived`.
+  - **Tier 2 (Relaxed Telemetry & State - 200ms interval)**: Throttled telemetry loop (5 Hz) for CPU usage, voice count, layer gains, and UI state feedback.
 - [ ] **State Synchronization & Control**: Handle remote container loading and layer volume/mute commands asynchronously.
 
----
+### Section 5: Network Auto-Discovery (mDNS / Bonjour Zero-Conf)
+- [ ] **mDNS / Bonjour Service Broadcasting**: Broadcast `_tutorkeybox._udp` service discovery so Mac GUI & tablet remote apps discover Raspberry Pi daemons automatically without entering IP addresses.
 
-## 2. Memory Management & Hard Power-off Resilience
-- [x] **Crash/Power-Cut Safe Storage**: Zero-copy memory-mapped container streams (`SampleContainerReader`) read raw float arrays in read-only mode so abrupt power loss on the RasPi never causes corrupted `.bin` files.
-- [ ] **RAM Allocation & Safety**: Verify all audio buffers and attack buffers pre-allocate RAM on boot with zero dynamic heap allocation in the audio render callback.
-
----
-
-## 3. Auto-Booting Sequence & GUI Startup Indicators
-- [ ] **RasPi System Daemon**: Create a `systemd` service configuration (`tutorkeybox.service`) for automatic headless boot on Pi power-up.
-- [ ] **Startup State Protocol**: Transmit explicit startup state flags over UDP (`Booting`, `Loading_Container`, `Ready`, `Error`).
-- [ ] **Mac GUI Banner Indicator**: Update `TelemetryHeaderView` to render dynamic visual state badges ("Keybox Starting Up...", "Keybox Ready", "Offline").
+### Section 6: MIDI CC Learn & Remote Mapping Engine
+- [ ] **Interactive MIDI CC Learn Engine**: Enable CC Learn mode for GUI sliders/knobs to bind physical hardware faders dynamically.
+- [ ] **Reverse CC Mapping & Fader Curves**: Support inverted CC mapping (CC 127 → 0.0, CC 0 → 1.0) and fader response transformations.
 
 ---
 
-## 4. Hardware Audio Device Selection & ALSA Priority
-- [x] **Explicit ALSA Device Priority**: Priority scanning algorithm added to `AudioEngine::initialize()`. Successfully selected high-performance hardware output (`500R8` @ 48kHz, 128 samples).
-- [x] **Audio Initialization Error Handling**: Reports active hardware output state (`isAudioOK()`) and logs full sample rate / buffer size details on startup.
+==============================================================================
+## TIER 4: GUI VISUALIZERS & COSMETICS (Visual Polish & UI)
+==============================================================================
+
+### Section 7: Auto-Booting Sequence & GUI Startup Indicators
+- [x] **RasPi Headless Auto-Loader**: Recover active presets from `preset.json` or fallback scan for available `.bin` containers on startup in `HeadlessMain.cpp`.
+- [x] **RasPi System Daemon File**: Created production `tutorkeybox.service` unit file configured for automatic system startup.
+- [ ] **Startup State Protocol & Mac GUI Indicator**: Transmit explicit startup state flags over UDP (`Booting`, `Loading_Container`, `Ready`, `Error`) and render dynamic visual badges on Mac GUI.
+
+### Section 8: Live Visualizers & Real-Time Inspection
+- [ ] **Interactive 88-Key Zone & Velocity Map**: Render an interactive 88-key mini-keyboard component in the GUI displaying active note triggers, velocity zones, and key coverage per layer.
+- [ ] **Polyphonic Voice Activity Meters**: Add real-time active voice count meters and voice stealing indicators per layer card.
 
 ---
 
-## 5. GUI Latency Configuration (32, 64, 128 Samples)
-- [x] **GUI Latency Selector**: Added dynamic ComboBox dropdown to `HardwareSelectorBar` (`32`, `64`, `128`, `256` samples).
-- [x] **Live Audio Re-configuration**: `AudioEngine::setBufferSize()` reconfigures hardware audio driver on the fly. `SetLatencyPacket` supported over UDP.
-
----
-
-## 6. Per-Layer MIDI Input Routing
-- [ ] **Layer Card Dropdowns**: Add a MIDI device selection dropdown to each of the 4 Layer Cards in `LayerCardComponent`.
-- [ ] **Input Filtering Logic**: Allow assigning specific hardware USB-MIDI controllers (or "All Inputs") to target synth layers (Layer 0, 1, 2, 3).
-
----
-
-## 7. Fixed Sample Format Implementation
-- [x] **Standardized Container Format**: Standardized audio format (32-bit float PCM arrays) for sample container `.bin` files.
-- [x] **Simplified Reader/Parser**: Zero RIFF WAV parsing overhead on runtime loading. Instant 480-sample load into `LayeredSynth`.
+==============================================================================
+## COMPLETED MILESTONES (Archived)
+==============================================================================
+- [x] **Fixed Sample Format Implementation**: Standardized 32-bit float PCM container files (`.bin`). Instant 480-sample load into `LayeredSynth`.
+- [x] **Hardware Audio Device Selection & ALSA Priority**: Explicit ALSA priority scanner (`500R8` @ 48kHz, 128 samples).
+- [x] **GUI Latency Configuration**: Latency selector dropdown (32, 64, 128, 256 samples) and `SetLatencyPacket` over UDP.

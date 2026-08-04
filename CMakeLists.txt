@@ -16,98 +16,105 @@ else()
     FetchContent_MakeAvailable(JUCE)
 endif()
 
-juce_add_gui_app(TutorKeybox
-    PRODUCT_NAME "TutorKeybox"
-    ICON_BIG "Resources/AppIcon.icns"
-)
+option(BUILD_GUI "Build desktop GUI application and tools" ON)
 
-target_sources(TutorKeybox
-    PRIVATE
-        Source/Main.cpp
-        Source/Core/MidiState.h
-        Source/Audio/AudioEngine.h
-        Source/Audio/AudioEngine.cpp
-        Source/GUI/TelemetryHeaderView.h
-        Source/GUI/TelemetryHeaderView.cpp
-        Source/GUI/HardwareSelectorBar.h
-        Source/GUI/HardwareSelectorBar.cpp
-        Source/GUI/LayerCardComponent.h
-        Source/GUI/LayerCardComponent.cpp
-        Source/GUI/MainComponent.h
-        Source/GUI/MainComponent.cpp
-        Source/Synth/SampleHeader.h
-        Source/Synth/CustomSamplerSound.h
-        Source/Synth/CustomSamplerVoice.h
-        Source/Synth/CustomSamplerVoice.cpp
-        Source/Synth/LayeredSynth.h
-        Source/Synth/LayeredSynth.cpp
-        Source/Synth/SampleContainerReader.h
-        Source/Synth/SampleContainerReader.cpp
-        Source/Synth/SamplePackager.h
-        Source/Synth/SamplePackager.cpp
-        Source/Core/PresetManager.h
-        Source/Core/PresetManager.cpp
-        Source/Network/NetworkProtocol.h
-        Source/Network/DeployClient.h
-        Source/Network/DeployClient.cpp
-        Source/GUI/DeployControlBar.h
-        Source/GUI/DeployControlBar.cpp
-)
+if (BUILD_GUI)
+    # ==============================================================================
+    # Desktop GUI Application Target
+    # ==============================================================================
+    juce_add_gui_app(TutorKeybox
+        PRODUCT_NAME "TutorKeybox"
+        ICON_BIG "Resources/AppIcon.icns"
+    )
 
-target_link_libraries(TutorKeybox
-    PRIVATE
-        juce::juce_audio_basics
-        juce::juce_audio_devices
-        juce::juce_audio_formats
-        juce::juce_audio_processors
-        juce::juce_audio_utils
-        juce::juce_core
-        juce::juce_data_structures
-        juce::juce_events
-        juce::juce_graphics
-        juce::juce_gui_basics
-        juce::juce_recommended_config_flags
-)
+    target_sources(TutorKeybox
+        PRIVATE
+            Source/Main.cpp
+            Source/Core/MidiState.h
+            Source/Audio/AudioEngine.h
+            Source/Audio/AudioEngine.cpp
+            Source/GUI/TelemetryHeaderView.h
+            Source/GUI/TelemetryHeaderView.cpp
+            Source/GUI/HardwareSelectorBar.h
+            Source/GUI/HardwareSelectorBar.cpp
+            Source/GUI/LayerCardComponent.h
+            Source/GUI/LayerCardComponent.cpp
+            Source/GUI/MainComponent.h
+            Source/GUI/MainComponent.cpp
+            Source/Synth/SampleHeader.h
+            Source/Synth/CustomSamplerSound.h
+            Source/Synth/CustomSamplerVoice.h
+            Source/Synth/CustomSamplerVoice.cpp
+            Source/Synth/LayeredSynth.h
+            Source/Synth/LayeredSynth.cpp
+            Source/Synth/SampleContainerReader.h
+            Source/Synth/SampleContainerReader.cpp
+            Source/Synth/SamplePackager.h
+            Source/Synth/SamplePackager.cpp
+            Source/Core/PresetManager.h
+            Source/Core/PresetManager.cpp
+            Source/Network/NetworkProtocol.h
+            Source/Network/DeployClient.h
+            Source/Network/DeployClient.cpp
+            Source/GUI/DeployControlBar.h
+            Source/GUI/DeployControlBar.cpp
+    )
 
-target_compile_definitions(TutorKeybox
-    PRIVATE
-        JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
-)
+    target_link_libraries(TutorKeybox
+        PRIVATE
+            juce::juce_audio_basics
+            juce::juce_audio_devices
+            juce::juce_audio_formats
+            juce::juce_audio_processors
+            juce::juce_audio_utils
+            juce::juce_core
+            juce::juce_data_structures
+            juce::juce_events
+            juce::juce_graphics
+            juce::juce_gui_basics
+            juce::juce_recommended_config_flags
+    )
 
-juce_generate_juce_header(TutorKeybox)
+    target_compile_definitions(TutorKeybox
+        PRIVATE
+            JUCE_WEB_BROWSER=0
+            JUCE_USE_CURL=0
+    )
 
-# ==============================================================================
-# Standalone Command-Line Sample Packager Utility
-# ==============================================================================
-juce_add_console_app(TKBPackager
-    PRODUCT_NAME "TKBPackager"
-)
+    juce_generate_juce_header(TutorKeybox)
 
-target_sources(TKBPackager
-    PRIVATE
-        Tools/Packager.cpp
-        Source/Synth/SampleHeader.h
-        Source/Synth/SamplePackager.h
-        Source/Synth/SamplePackager.cpp
-)
+    # ==============================================================================
+    # Standalone Command-Line Sample Packager Utility
+    # ==============================================================================
+    juce_add_console_app(TKBPackager
+        PRODUCT_NAME "TKBPackager"
+    )
 
-target_link_libraries(TKBPackager
-    PRIVATE
-        juce::juce_audio_formats
-        juce::juce_audio_basics
-        juce::juce_core
-        juce::juce_events
-        juce::juce_graphics
-        juce::juce_gui_basics
-        juce::juce_recommended_config_flags
-)
+    target_sources(TKBPackager
+        PRIVATE
+            Tools/Packager.cpp
+            Source/Synth/SampleHeader.h
+            Source/Synth/SamplePackager.h
+            Source/Synth/SamplePackager.cpp
+    )
 
-target_compile_definitions(TKBPackager
-    PRIVATE
-        JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
-)
+    target_link_libraries(TKBPackager
+        PRIVATE
+            juce::juce_audio_formats
+            juce::juce_audio_basics
+            juce::juce_core
+            juce::juce_events
+            juce::juce_graphics
+            juce::juce_gui_basics
+            juce::juce_recommended_config_flags
+    )
+
+    target_compile_definitions(TKBPackager
+        PRIVATE
+            JUCE_WEB_BROWSER=0
+            JUCE_USE_CURL=0
+    )
+endif()
 
 # ==============================================================================
 # Headless Audio Engine Core (Raspberry Pi 5 Daemon - 0% GUI Overhead)
@@ -115,6 +122,7 @@ target_compile_definitions(TKBPackager
 juce_add_console_app(TutorKeyboxCore
     PRODUCT_NAME "TutorKeyboxCore"
 )
+
 target_sources(TutorKeyboxCore
     PRIVATE
         Source/Core/HeadlessMain.cpp
@@ -135,6 +143,7 @@ target_sources(TutorKeyboxCore
         Source/Network/NetworkServer.h
         Source/Network/NetworkServer.cpp
 )
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
     target_compile_options(TutorKeyboxCore PRIVATE -O3 -mcpu=cortex-a76)
 endif()

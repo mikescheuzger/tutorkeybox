@@ -17,6 +17,10 @@ public:
 private:
   AudioEngine &audioEngine;
 
+  juce::Label audioOutputLabel;
+  juce::Label midiInputLabel;
+  juce::Label latencyLabel;
+
   juce::ComboBox audioOutputSelector;
   juce::ComboBox midiInputSelector;
   juce::ComboBox latencySelector;

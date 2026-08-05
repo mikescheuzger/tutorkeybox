@@ -142,6 +142,8 @@ target_sources(TutorKeyboxCore
         Source/Network/NetworkProtocol.h
         Source/Network/NetworkServer.h
         Source/Network/NetworkServer.cpp
+        Source/Network/DeployServer.h
+        Source/Network/DeployServer.cpp
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")

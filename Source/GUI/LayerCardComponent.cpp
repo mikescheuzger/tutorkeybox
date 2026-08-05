@@ -1,8 +1,10 @@
 #include "LayerCardComponent.h"
 
 LayerCardComponent::LayerCardComponent(int layerIndexToManage,
-                                       AudioEngine &engineToControl)
-    : layerIndex(layerIndexToManage), audioEngine(engineToControl) {
+                                       AudioEngine &engineToControl,
+                                       PresetManager &presetToUpdate)
+    : layerIndex(layerIndexToManage), audioEngine(engineToControl),
+      presetManager(presetToUpdate) {
   // Volume Slider Setup
   volumeSlider.setSliderStyle(juce::Slider::LinearVertical);
   volumeSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
@@ -11,16 +13,25 @@ LayerCardComponent::LayerCardComponent(int layerIndexToManage,
   volumeSlider.onValueChange = [this]() {
     audioEngine.getSynth().setLayerVolume(layerIndex,
                                           (float)volumeSlider.getValue());
+    updatePresetState();
   };
   addAndMakeVisible(volumeSlider);
 
   // Mute Button Setup
   muteButton.setButtonText("Mute");
+  muteButton.setClickingTogglesState(true);
   muteButton.onClick = [this]() {
     audioEngine.getSynth().setLayerMuted(layerIndex,
                                          muteButton.getToggleState());
+    updatePresetState();
   };
   addAndMakeVisible(muteButton);
+}
+
+void LayerCardComponent::updatePresetState() {
+  presetManager.setLayerPreset(layerIndex, (float)volumeSlider.getValue(),
+                               muteButton.getToggleState(),
+                               loadedContainerPath);
 }
 
 bool LayerCardComponent::isInterestedInFileDrag(
@@ -56,6 +67,8 @@ void LayerCardComponent::filesDropped(const juce::StringArray &files, int /*x*/,
       if (SampleContainerReader::loadContainerFile(file, audioEngine.getSynth(),
                                                    layerIndex)) {
         loadedInstrumentName = file.getFileNameWithoutExtension();
+        loadedContainerPath = file.getFullPathName();
+        updatePresetState();
         repaint();
       }
     } else if (file.isDirectory() ||
@@ -68,6 +81,8 @@ void LayerCardComponent::filesDropped(const juce::StringArray &files, int /*x*/,
         if (SampleContainerReader::loadContainerFile(
                 tempBin, audioEngine.getSynth(), layerIndex)) {
           loadedInstrumentName = file.getFileNameWithoutExtension();
+          loadedContainerPath = tempBin.getFullPathName();
+          updatePresetState();
           repaint();
         }
       }

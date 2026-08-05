@@ -33,10 +33,10 @@ private:
   TelemetryHeaderView telemetryHeader{midiState, audioEngine};
   HardwareSelectorBar hardwareBar{audioEngine};
 
-  LayerCardComponent layerCard0{0, audioEngine};
-  LayerCardComponent layerCard1{1, audioEngine};
-  LayerCardComponent layerCard2{2, audioEngine};
-  LayerCardComponent layerCard3{3, audioEngine};
+  LayerCardComponent layerCard0{0, audioEngine, presetManager};
+  LayerCardComponent layerCard1{1, audioEngine, presetManager};
+  LayerCardComponent layerCard2{2, audioEngine, presetManager};
+  LayerCardComponent layerCard3{3, audioEngine, presetManager};
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

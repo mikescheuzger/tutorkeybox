@@ -2,6 +2,23 @@
 
 HardwareSelectorBar::HardwareSelectorBar(AudioEngine &engineToControl)
     : audioEngine(engineToControl) {
+  // Label Setup
+  audioOutputLabel.setText("Audio Output", juce::dontSendNotification);
+  audioOutputLabel.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+  audioOutputLabel.setColour(juce::Label::textColourId, juce::Colours::cyan);
+  addAndMakeVisible(audioOutputLabel);
+
+  midiInputLabel.setText("MIDI Input", juce::dontSendNotification);
+  midiInputLabel.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+  midiInputLabel.setColour(juce::Label::textColourId, juce::Colours::cyan);
+  addAndMakeVisible(midiInputLabel);
+
+  latencyLabel.setText("Buffer / Latency", juce::dontSendNotification);
+  latencyLabel.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+  latencyLabel.setColour(juce::Label::textColourId, juce::Colours::cyan);
+  addAndMakeVisible(latencyLabel);
+
+  // Dropdown Setup
   audioOutputSelector.setTextWhenNothingSelected("Select Audio Output");
   midiInputSelector.setTextWhenNothingSelected("Select MIDI Input");
   latencySelector.setTextWhenNothingSelected("Select Latency");
@@ -130,9 +147,18 @@ void HardwareSelectorBar::resized() {
   auto area = getLocalBounds();
   int itemWidth = (area.getWidth() - 16) / 3;
 
-  audioOutputSelector.setBounds(area.removeFromLeft(itemWidth));
+  auto col1 = area.removeFromLeft(itemWidth);
   area.removeFromLeft(8);
-  midiInputSelector.setBounds(area.removeFromLeft(itemWidth));
+  auto col2 = area.removeFromLeft(itemWidth);
   area.removeFromLeft(8);
-  latencySelector.setBounds(area);
+  auto col3 = area;
+
+  audioOutputLabel.setBounds(col1.removeFromTop(20));
+  audioOutputSelector.setBounds(col1.removeFromTop(28));
+
+  midiInputLabel.setBounds(col2.removeFromTop(20));
+  midiInputSelector.setBounds(col2.removeFromTop(28));
+
+  latencyLabel.setBounds(col3.removeFromTop(20));
+  latencySelector.setBounds(col3.removeFromTop(28));
 }

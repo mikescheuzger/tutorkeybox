@@ -16,3 +16,6 @@
 4. **Raspberry Pi Hardware Environment**:
    - The Raspberry Pi 5 system user is always `kbox`.
    - All paths on the Pi use `/home/kbox/TutorKeyBox01`. Never use `pi` as the username.
+
+5. **TODO List Management**:
+   - You are allowed to add items to the TODO-List, but you must ask for permission in advance before doing so.

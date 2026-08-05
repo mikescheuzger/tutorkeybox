@@ -1,6 +1,7 @@
 #include "../Audio/AudioEngine.h"
 #include "../Core/MidiState.h"
 #include "../Core/PresetManager.h"
+#include "../Network/DeployServer.h"
 #include "../Network/NetworkServer.h"
 #include <juce_core/juce_core.h>
 
@@ -41,40 +42,37 @@ int main(int argc, char *argv[]) {
               layerPreset.sampleContainerPath);
         }
         if (binFile.existsAsFile()) {
-          juce::Logger::writeToLog("Loading Layer " + juce::String(layerIdx) +
-                                   " container: " + binFile.getFileName());
           SampleContainerReader::loadContainerFile(
               binFile, audioEngine.getSynth(), layerIdx);
         }
       }
     }
   } else {
-    // Fallback: Scan local folder for any available .bin container (e.g.
-    // TestPiano.bin)
     auto binFiles = juce::File::getCurrentWorkingDirectory().findChildFiles(
         juce::File::findFiles, false, "*.bin");
     if (!binFiles.isEmpty()) {
-      juce::Logger::writeToLog(
-          "Headless Core: Auto-loading default container -> " +
-          binFiles[0].getFileName());
       SampleContainerReader::loadContainerFile(binFiles[0],
                                                audioEngine.getSynth(), 0);
     }
   }
 
-  // 3. Launch Network Server Daemon
+  // 3. Launch Network & Hardware Deploy Server Daemons
   NetworkServer server(audioEngine, midiState);
   server.startServer(NetworkProtocol::DEFAULT_PORT);
 
+  DeployServer deployServer(audioEngine, presetManager);
+  deployServer.startServer();
+
   juce::Logger::writeToLog(
-      "Headless Audio Core is running live on Raspberry Pi 5!");
+      "Headless Audio Core & Deploy Server running live on Raspberry Pi 5!");
   juce::Logger::writeToLog("Press Ctrl+C to stop.");
 
-  // Keep headless daemon process alive
+  // Keep process alive
   while (true) {
     juce::Thread::sleep(1000);
   }
 
+  deployServer.stopServer();
   server.stopServer();
   audioEngine.shutdown();
   return 0;

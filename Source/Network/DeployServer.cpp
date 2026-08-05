@@ -9,14 +9,14 @@ DeployServer::~DeployServer() { stopServer(); }
 
 bool DeployServer::startServer() {
   if (!serverSocket.createListener(DEPLOY_PORT)) {
-    juce::Logger::writeToLog("DeployServer Error: Failed to create listener on port " +
+    juce::Logger::writeToLog("DeployServer Error: Failed listener on port " +
                              juce::String(DEPLOY_PORT));
     return false;
   }
 
   isRunning = true;
   startThread(juce::Thread::Priority::normal);
-  juce::Logger::writeToLog("DeployServer: Listening for hardware deployment packages on TCP port " +
+  juce::Logger::writeToLog("DeployServer: Listening on TCP port " +
                            juce::String(DEPLOY_PORT));
   return true;
 }
@@ -38,15 +38,15 @@ void DeployServer::run() {
 }
 
 void DeployServer::handleIncomingClient(juce::StreamingSocket *clientSocket) {
-  juce::Logger::writeToLog("DeployServer: Incoming connection from Mac Deployer!");
+  juce::Logger::writeToLog(
+      "DeployServer: Incoming preset deployment from Mac!");
 
-  // Read header size
   int32_t jsonSize = 0;
   if (clientSocket->read(&jsonSize, sizeof(jsonSize), true) != sizeof(jsonSize))
     return;
 
   if (jsonSize <= 0 || jsonSize > 10 * 1024 * 1024)
-    return; // Sanity check 10 MB limit for JSON
+    return;
 
   juce::MemoryBlock jsonBuffer((size_t)jsonSize);
   if (clientSocket->read(jsonBuffer.getData(), jsonSize, true) != jsonSize)
@@ -54,12 +54,30 @@ void DeployServer::handleIncomingClient(juce::StreamingSocket *clientSocket) {
 
   juce::String jsonText = jsonBuffer.toString();
   if (presetManager.loadFromJsonString(jsonText)) {
-    juce::Logger::writeToLog("DeployServer Success: Deployed new hardware preset configuration!");
+    juce::Logger::writeToLog("DeployServer Success: Deployed hardware preset!");
 
-    // Save deployed preset to persistent storage
+    // Apply deployed preset directly to live Pi audio engine
+    for (int layerIdx = 0; layerIdx < 4; ++layerIdx) {
+      const auto &layerPreset = presetManager.getLayerPreset(layerIdx);
+      audioEngine.getSynth().setLayerVolume(layerIdx, layerPreset.volume);
+      audioEngine.getSynth().setLayerMute(layerIdx, layerPreset.muted);
+
+      if (layerPreset.sampleContainerPath.isNotEmpty()) {
+        juce::File binFile(layerPreset.sampleContainerPath);
+        if (!juce::File::isAbsolutePath(layerPreset.sampleContainerPath)) {
+          binFile = juce::File::getCurrentWorkingDirectory().getChildFile(
+              layerPreset.sampleContainerPath);
+        }
+        if (binFile.existsAsFile()) {
+          SampleContainerReader::loadContainerFile(
+              binFile, audioEngine.getSynth(), layerIdx);
+        }
+      }
+    }
+
+    // Persist active preset on Pi disk
     juce::File presetFile =
-        juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-            .getChildFile("deployed_preset.json");
+        juce::File::getCurrentWorkingDirectory().getChildFile("preset.json");
     presetManager.saveToFile(presetFile);
   }
 }

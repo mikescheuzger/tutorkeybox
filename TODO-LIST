@@ -17,6 +17,7 @@
 - [x] **RasPi Headless Preset Auto-Loader**: Recover active presets from `preset.json` or fallback scan for available `.bin` containers on startup in `HeadlessMain.cpp`.
 - [x] **RasPi Systemd Service Configuration**: Created production `tutorkeybox.service` unit file configured for automatic headless boot.
 - [ ] **Physical Standalone Hardware Verification**: Install `tutorkeybox.service` on Raspberry Pi 5 system, test cold power-up without display/Mac, and verify real-time audio playback.
+- [ ] **Optimize Booting Time for under 15s**: Streamline Pi 5 kernel/firmware EEPROM initialization and systemd service ordering to achieve <15s cold boot to audio playback.
 
 ### Section 4: Build System & Compilation Overhead Cleanup
 - [x] **Strip Graphics from Command-Line Utilities**: Removed `juce_graphics` and `juce_gui_basics` dependencies from `TKBPackager` command-line tool.

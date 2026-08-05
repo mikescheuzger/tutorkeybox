@@ -7,7 +7,6 @@ AudioEngine::~AudioEngine() { shutdown(); }
 
 bool AudioEngine::initialize() {
   audioDeviceOK = false;
-  // 1. Prefer ALSA device type on Linux/RasPi, CoreAudio on macOS
   juce::String preferredDeviceType = "ALSA";
   const auto &availableTypes = deviceManager.getAvailableDeviceTypes();
 
@@ -18,26 +17,27 @@ bool AudioEngine::initialize() {
     }
   }
 
-  // 2. Scan available output devices and select highest priority hardware
+  // Scan available output devices and select direct hardware (preferring hw: or
+  // USB/DAC)
   auto *currentType = deviceManager.getCurrentDeviceTypeObject();
   juce::String bestOutputDevice = "";
   if (currentType != nullptr) {
-    auto outputDevices = currentType->getDeviceNames(false); // output devices
+    auto outputDevices = currentType->getDeviceNames(false);
     int highestScore = -1;
     for (const auto &devName : outputDevices) {
-      int score = 1; // Default medium priority
+      int score = 1;
       if (devName.containsIgnoreCase("USB") ||
           devName.containsIgnoreCase("DAC") ||
-          devName.containsIgnoreCase("HiFiBerry") ||
+          devName.containsIgnoreCase("iO") ||
           devName.containsIgnoreCase("Focusrite") ||
           devName.containsIgnoreCase("500R8")) {
-        score = 3; // Top priority: USB / Hardware DAC
+        score = 3; // Top priority: Dedicated Hardware Audio Interface / DAC
       } else if (devName.startsWithIgnoreCase("hw:") ||
                  devName.startsWithIgnoreCase("plughw:")) {
-        score = 2; // Direct ALSA hardware
+        score = 2; // Direct ALSA Hardware (bypass PulseAudio/PipeWire)
       } else if (devName.containsIgnoreCase("hdmi") ||
                  devName.containsIgnoreCase("bcm2835")) {
-        score = 0; // Avoid HDMI output
+        score = 0; // Avoid onboard HDMI audio
       }
       if (score > highestScore) {
         highestScore = score;
@@ -46,19 +46,22 @@ bool AudioEngine::initialize() {
     }
   }
 
-  // 3. Configure Audio Device Setup
+  // Configure Ultra-Low-Latency Setup: 64 samples @ 48kHz
   juce::AudioDeviceManager::AudioDeviceSetup setup;
   deviceManager.getAudioDeviceSetup(setup);
-  setup.outputChannels = 2; // Stereo output
+  setup.outputChannels = 2;
   setup.inputChannels = 0;
+  setup.sampleRate = 48000.0;
+  setup.bufferSize = 64; // Ultra-low latency (64 samples ≈ 1.3ms)
+
   if (bestOutputDevice.isNotEmpty()) {
     setup.outputDeviceName = bestOutputDevice;
   }
-  setup.bufferSize = 128; // Low-latency buffer size
+
   juce::String error = deviceManager.setAudioDeviceSetup(setup, true);
   if (error.isNotEmpty()) {
     juce::Logger::writeToLog(
-        "AudioEngine Error: Failed to open audio device - " + error);
+        "AudioEngine Error: Failed to open hardware audio device - " + error);
     deviceManager.initialiseWithDefaultDevices(0, 2);
   }
 
@@ -76,10 +79,8 @@ bool AudioEngine::initialize() {
         "AudioEngine Warning: No active audio output device opened!");
   }
 
-  // 4. Register audio callback
+  deviceManager.removeAudioCallback(this);
   deviceManager.addAudioCallback(this);
-
-  // 5. Scan and enable all connected hardware MIDI controllers
   refreshMidiInputs();
 
   return audioDeviceOK;

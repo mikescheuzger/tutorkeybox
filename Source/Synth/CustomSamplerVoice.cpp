@@ -68,9 +68,12 @@ void CustomSamplerVoice::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
   if (activeSound == nullptr)
     return;
 
-  const auto &tailBuffer = activeSound->getTailBuffer();
-  const int tailNumSamples = tailBuffer.getNumSamples();
-  const float *const *tailChannels = tailBuffer.getArrayOfReadPointers();
+  const auto &attackBuffer = activeSound->getAttackBuffer();
+  const int attackNumSamples = attackBuffer.getNumSamples();
+  const float *const *attackChannels = attackBuffer.getArrayOfReadPointers();
+
+  const float *const *tailChannels = activeSound->getTailChannelPointers();
+  const int tailNumSamples = activeSound->getTailNumSamples();
 
   float *outL = outputBuffer.getWritePointer(0, startSample);
   float *outR = outputBuffer.getNumChannels() > 1
@@ -83,11 +86,22 @@ void CustomSamplerVoice::renderNextBlock(juce::AudioBuffer<float> &outputBuffer,
     float sampleL = 0.0f;
     float sampleR = 0.0f;
 
-    if (posInt < tailNumSamples - 1) {
+    if (posInt < attackNumSamples - 1) {
+      // Phase 1: Render from RAM Attack Buffer (0ms latency, zero glitch risk)
+      sampleL =
+          attackChannels[0][posInt] +
+          alpha * (attackChannels[0][posInt + 1] - attackChannels[0][posInt]);
+      sampleR = (attackBuffer.getNumChannels() > 1)
+                    ? attackChannels[1][posInt] +
+                          alpha * (attackChannels[1][posInt + 1] -
+                                   attackChannels[1][posInt])
+                    : sampleL;
+    } else if (posInt < tailNumSamples - 1) {
+      // Phase 2: Seamlessly stream Tail from Memory-Mapped File (mmap)
       sampleL = tailChannels[0][posInt] +
                 alpha * (tailChannels[0][posInt + 1] - tailChannels[0][posInt]);
       sampleR =
-          (tailBuffer.getNumChannels() > 1)
+          (activeSound->getNumChannels() > 1)
               ? tailChannels[1][posInt] + alpha * (tailChannels[1][posInt + 1] -
                                                    tailChannels[1][posInt])
               : sampleL;

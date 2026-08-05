@@ -7,7 +7,13 @@ AudioEngine::~AudioEngine() { shutdown(); }
 
 bool AudioEngine::initialize() {
   audioDeviceOK = false;
+
+#if JUCE_MAC
+  juce::String preferredDeviceType = "CoreAudio";
+#else
   juce::String preferredDeviceType = "ALSA";
+#endif
+
   const auto &availableTypes = deviceManager.getAvailableDeviceTypes();
 
   for (auto *type : availableTypes) {
@@ -17,13 +23,14 @@ bool AudioEngine::initialize() {
     }
   }
 
-  // Scan available output devices and prioritize direct hardware (iO2 / USB
-  // DAC)
-  auto *currentType = deviceManager.getCurrentDeviceTypeObject();
   juce::String bestOutputDevice = "";
+  auto *currentType = deviceManager.getCurrentDeviceTypeObject();
+
   if (currentType != nullptr) {
-    auto outputDevices = currentType->getDeviceNames(false);
+    currentType->scanForDevices();
+    auto outputDevices = currentType->getDeviceNames(false); // output devices
     int highestScore = -1;
+
     for (const auto &devName : outputDevices) {
       int score = 1;
       if (devName.containsIgnoreCase("hw:CARD=iO2") ||
@@ -33,7 +40,7 @@ bool AudioEngine::initialize() {
         score = 10; // Top priority: Direct hardware Alesis iO|2 interface!
       } else if (devName.startsWithIgnoreCase("hw:") ||
                  devName.startsWithIgnoreCase("plughw:")) {
-        score = 5; // Direct ALSA Hardware (bypasses PulseAudio/PipeWire)
+        score = 5; // Direct ALSA Hardware
       } else if (devName.containsIgnoreCase("USB") ||
                  devName.containsIgnoreCase("DAC") ||
                  devName.containsIgnoreCase("500R8")) {
@@ -41,8 +48,9 @@ bool AudioEngine::initialize() {
       } else if (devName.containsIgnoreCase("Default") ||
                  devName.containsIgnoreCase("hdmi") ||
                  devName.containsIgnoreCase("bcm2835")) {
-        score = 0; // Avoid Default software wrapper and HDMI
+        score = 0;
       }
+
       if (score > highestScore) {
         highestScore = score;
         bestOutputDevice = devName;
@@ -50,13 +58,12 @@ bool AudioEngine::initialize() {
     }
   }
 
-  // Configure Ultra-Low-Latency Setup: 64 samples @ 48kHz
   juce::AudioDeviceManager::AudioDeviceSetup setup;
   deviceManager.getAudioDeviceSetup(setup);
   setup.outputChannels = 2;
   setup.inputChannels = 0;
   setup.sampleRate = 48000.0;
-  setup.bufferSize = 64; // Ultra-low latency (64 samples ≈ 1.3ms)
+  setup.bufferSize = 128; // Standard low-latency buffer
 
   if (bestOutputDevice.isNotEmpty()) {
     setup.outputDeviceName = bestOutputDevice;

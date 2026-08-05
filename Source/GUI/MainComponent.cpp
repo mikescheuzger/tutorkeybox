@@ -10,9 +10,10 @@ MainComponent::MainComponent() {
   addAndMakeVisible(layerCard2);
   addAndMakeVisible(layerCard3);
 
-  // 1. Initialize audio hardware & MIDI inputs FIRST
+  // Initialize local Mac audio engine & MIDI hardware
   audioEngine.initialize();
 
+  // Auto-load test piano into Layer 0 for instant local playing
   juce::File testBin =
       juce::File::getCurrentWorkingDirectory().getChildFile("TestPiano.bin");
   if (testBin.existsAsFile()) {
@@ -20,9 +21,7 @@ MainComponent::MainComponent() {
                                              0);
   }
 
-  // 2. Populate dropdown choices NOW that hardware is initialized!
   hardwareBar.updateDropdowns();
-
   setSize(840, 560);
 }
 
@@ -34,7 +33,6 @@ void MainComponent::paint(juce::Graphics &g) {
 
 void MainComponent::resized() {
   auto area = getLocalBounds().reduced(10);
-
   deployBar.setBounds(area.removeFromTop(36));
   area.removeFromTop(10);
 
@@ -43,7 +41,6 @@ void MainComponent::resized() {
   telemetryHeader.setBounds(topRow);
 
   area.removeFromTop(15);
-
   int cardWidth = area.getWidth() / 4;
   layerCard0.setBounds(area.removeFromLeft(cardWidth).reduced(5, 0));
   layerCard1.setBounds(area.removeFromLeft(cardWidth).reduced(5, 0));

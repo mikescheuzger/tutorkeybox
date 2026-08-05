@@ -17,8 +17,8 @@ bool AudioEngine::initialize() {
     }
   }
 
-  // Scan available output devices and select direct hardware (preferring hw: or
-  // USB/DAC)
+  // Scan available output devices and prioritize direct hardware (iO2 / USB
+  // DAC)
   auto *currentType = deviceManager.getCurrentDeviceTypeObject();
   juce::String bestOutputDevice = "";
   if (currentType != nullptr) {
@@ -26,18 +26,22 @@ bool AudioEngine::initialize() {
     int highestScore = -1;
     for (const auto &devName : outputDevices) {
       int score = 1;
-      if (devName.containsIgnoreCase("USB") ||
-          devName.containsIgnoreCase("DAC") ||
-          devName.containsIgnoreCase("iO") ||
-          devName.containsIgnoreCase("Focusrite") ||
-          devName.containsIgnoreCase("500R8")) {
-        score = 3; // Top priority: Dedicated Hardware Audio Interface / DAC
+      if (devName.containsIgnoreCase("hw:CARD=iO2") ||
+          devName.containsIgnoreCase("plughw:CARD=iO2") ||
+          devName.containsIgnoreCase("iO2") ||
+          devName.containsIgnoreCase("iO|2")) {
+        score = 10; // Top priority: Direct hardware Alesis iO|2 interface!
       } else if (devName.startsWithIgnoreCase("hw:") ||
                  devName.startsWithIgnoreCase("plughw:")) {
-        score = 2; // Direct ALSA Hardware (bypass PulseAudio/PipeWire)
-      } else if (devName.containsIgnoreCase("hdmi") ||
+        score = 5; // Direct ALSA Hardware (bypasses PulseAudio/PipeWire)
+      } else if (devName.containsIgnoreCase("USB") ||
+                 devName.containsIgnoreCase("DAC") ||
+                 devName.containsIgnoreCase("500R8")) {
+        score = 3;
+      } else if (devName.containsIgnoreCase("Default") ||
+                 devName.containsIgnoreCase("hdmi") ||
                  devName.containsIgnoreCase("bcm2835")) {
-        score = 0; // Avoid onboard HDMI audio
+        score = 0; // Avoid Default software wrapper and HDMI
       }
       if (score > highestScore) {
         highestScore = score;
